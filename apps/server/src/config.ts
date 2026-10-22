@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import { join } from 'node:path';
+import { config as loadEnv } from 'dotenv';
+
+// `.env` can live either next to the server package or at the repository root.
+// dotenv never overwrites variables that are already set, so the first file wins.
+loadEnv({ path: join(__dirname, '../.env') });
+loadEnv({ path: join(__dirname, '../../../.env') });
 
 function readBool(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;

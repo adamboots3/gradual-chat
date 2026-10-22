@@ -68,6 +68,8 @@ MONGODB_URI=mongodb://127.0.0.1:27017/gradual_chat npm run dev
 
 ## Demo accounts
 
+![Sign in](docs/screenshots/00-login.png)
+
 Every seeded account uses the password **`password123`**. The sign-in screen lists them, so you can click one
 instead of typing.
 

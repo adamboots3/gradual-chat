@@ -1,5 +1,5 @@
-﻿/**
- * Dev-only helper: captures the four design states into docs/screenshots/.
+/**
+ * Dev-only helper: captures the four designed states into docs/screenshots/.
  *
  *   node scripts/capture.mjs            # uses the running dev servers
  *   BASE_URL=http://localhost:4000 node scripts/capture.mjs
@@ -38,32 +38,38 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
+// Keep the pointer away from message rows so hover-only affordances stay hidden.
+const parkPointer = () => page.mouse.move(24, 880);
+
 await page.goto(BASE_URL, { waitUntil: 'networkidle' });
 await page.getByRole('button', { name: 'Sign in' }).click();
 await page.getByRole('button', { name: 'Account menu' }).waitFor();
 await page.getByText('Share your story').first().waitFor();
+await parkPointer();
 
-// 01 鈥?default conversation
+// 01 — default conversation
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT_DIR}/01-conversation.png` });
 
-// 02 鈥?hover actions on a message
-const bubble = page.getByText('Check out Vanilla Forums (11/17 - 11/18/20) for free.', {
-  exact: true,
-});
-await bubble.first().hover();
+// 02 — hover actions on a message
+await page
+  .getByText('Check out Vanilla Forums (11/17 - 11/18/20) for free.', { exact: true })
+  .first()
+  .hover();
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT_DIR}/02-hover-actions.png` });
 
-// 03 鈥?quote reply in the composer
+// 03 — quote reply in the composer
 await page.getByRole('button', { name: 'Quote reply' }).first().click();
 await page.getByLabel(/Message Share your story/).fill('Many thanks!');
+await parkPointer();
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT_DIR}/03-quote-reply.png` });
 
-// 04 鈥?@mention autocomplete
+// 04 — @mention autocomplete
 await page.getByLabel(/Message Share your story/).fill('Reminder for @');
 await page.waitForTimeout(600);
+await parkPointer();
 await page.screenshot({ path: `${OUT_DIR}/04-mentions.png` });
 
 await browser.close();
