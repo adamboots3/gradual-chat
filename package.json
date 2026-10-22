@@ -1,0 +1,45 @@
+{
+  "name": "gradual-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Slack-style realtime chat app built with React, Apollo GraphQL, socket.io and MongoDB.",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace @gradual/server",
+    "dev:web": "npm run dev --workspace @gradual/web",
+    "build": "npm run build --workspace @gradual/server && npm run build --workspace @gradual/web",
+    "start": "npm run start --workspace @gradual/server",
+    "seed": "npm run seed --workspace @gradual/server",
+    "test": "npm run test --workspace @gradual/server && npm run test --workspace @gradual/web",
+    "test:coverage": "npm run test:coverage --workspace @gradual/server && npm run test:coverage --workspace @gradual/web",
+    "typecheck": "npm run typecheck --workspace @gradual/server && npm run typecheck --workspace @gradual/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "screenshots": "node scripts/capture.mjs",
+    "verify:realtime": "node scripts/realtime-smoke.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "playwright-core": "^1.64.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true,
+    "mongodb-memory-server@10.4.3": true,
+    "@apollo/protobufjs@1.2.8": true
+  }
+}
