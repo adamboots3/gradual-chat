@@ -98,7 +98,7 @@ instead of typing.
 | *(optional)* Unread count | ✅ Per-channel badges, @-mention markers, read cursors | `services/readState.ts` |
 | *(optional)* Quote reply model + API | ✅ Self-referencing `replyToId`, same-channel validation, quote UI | `services/messages.ts` |
 | *(optional)* Mention someone | ✅ Parsing, autocomplete, highlighting, mention counters | `services/mentions.ts` |
-| *(optional)* Frontend and backend unit tests | ✅ 59 tests (33 backend, 26 frontend) | `apps/*/test` |
+| *(optional)* Frontend and backend unit tests | ✅ 105 tests (53 backend, 52 frontend) | `apps/*/test` |
 
 A few things the brief did not ask for but that make the app feel finished: message pagination, soft deletes,
 edit support in the API, a message search filter, a `/healthz` endpoint, and a Docker image that serves the API
@@ -290,26 +290,41 @@ npm test                 # both workspaces
 npm run test:coverage    # with coverage
 ```
 
-**Backend (33 tests).** Each file boots its own in-memory MongoDB, so nothing touches a real database.
+Current coverage: **83.6%** of backend statements/lines and **61.8%** of frontend lines
+(**83.5%** of branches) — the frontend number is dominated by layout-only components that have no
+behaviour of their own.
+
+**Backend (53 tests).** Each file boots its own in-memory MongoDB, so nothing touches a real database.
 
 - `mentions.test.ts` — parser edge cases: emails must not become mentions, handles stop at punctuation, case
   insensitivity, de-duplication.
 - `cursor.test.ts` — cursor round-trip, malformed cursor rejection, page-size clamping.
-- `auth.test.ts` — hashing, token signing/verification, tampered tokens.
+- `auth.test.ts` / `context.test.ts` — hashing, token signing, tampered tokens, bearer-header parsing
+  (including array headers and invalid tokens).
 - `messages.test.ts` — unread increments only for others, mention counters, quote validation across channels,
   empty body rejection, membership enforcement, delete decrements the badge, pagination walking backwards,
   deleted messages disappearing from the timeline, sidebar badge aggregation.
+- `readState.test.ts` — read-state backfill is idempotent, author cursor moves on send.
+- `realtime.test.ts` — a real socket.io server and clients: unauthenticated sockets are rejected, messages reach
+  the other channel member, unread badges are pushed to the recipient, typing events are scoped to members.
+- `http.test.ts` — the Express surface end to end: health check, GraphQL over POST, unauthenticated requests,
+  malformed JSON returning 400 rather than crashing.
 - `resolvers.test.ts` — GraphQL layer through `executeOperation`: login failures, auth guards, unread in the
-  channel list, `markChannelRead`, sending with a mention.
+  channel list, `markChannelRead`, mentions, edit/delete permissions.
 
-**Frontend (26 tests)** with Testing Library:
+**Frontend (52 tests)** with Testing Library:
 
 - `MessageBody` — bold/italic/strike/code, mention highlighting, lists, and a regression test proving raw HTML is
   never injected.
-- `MessageItem` — quote preview, "edited" marker, quote available on all messages while delete is author-only.
-- `ChannelList` — unread badge, @-marker, active state, search filtering, selection.
+- `MessageItem` / `ChatHeader` — quote previews, "edited" marker, author-only delete, typing indicator.
+- `ChannelList` / `SideRail` / `TopBar` — unread badges, @-markers, active state, search filtering, account menu.
 - `Composer` — Enter sends, Shift+Enter keeps a newline, quote bar wiring, cancel reply, bold wrapping,
   typing callbacks.
+- `LoginPage` — demo accounts prefill, account switching, token hand-off, error state.
+- `cache` / `messagesCache` — regression cover for the two cache bugs found while building: socket payloads
+  written without `__typename` (which blanked `lastMessage.author`) and cursor pagination replacing instead of
+  prepending.
+- `ErrorBoundary` — a render error degrades to a recoverable card instead of a white screen.
 - `format` — helpers degrade gracefully on missing data.
 
 **End-to-end (optional, local only).** `npm run verify:realtime` drives two headless browser sessions (Jenny and

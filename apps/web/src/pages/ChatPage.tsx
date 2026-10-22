@@ -137,6 +137,12 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   useEffect(() => {
     if (!me) return;
     const realtime: RealtimeClient = connectRealtime(token, {
+      // A socket can connect before the gateway has finished joining its channel
+      // rooms, and messages sent while disconnected are never replayed — so we
+      // reconcile from the source of truth on every (re)connect.
+      onConnected() {
+        void client.refetchQueries({ include: [CHANNELS, MESSAGES] });
+      },
       onMessage(message) {
         appendMessage(message);
         if (message.channelId === activeIdRef.current && message.author.id !== me.id) {

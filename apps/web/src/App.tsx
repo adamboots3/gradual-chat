@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LoginPage } from './components/LoginPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ChatPage } from './pages/ChatPage';
 import { getStoredToken, storeToken } from './lib/apollo';
 
@@ -16,7 +17,13 @@ export default function App() {
     setToken(null);
   };
 
-  if (!token) return <LoginPage onAuthenticated={handleAuthenticated} />;
-
-  return <ChatPage token={token} onSignOut={handleSignOut} />;
+  return (
+    <ErrorBoundary>
+      {token ? (
+        <ChatPage token={token} onSignOut={handleSignOut} />
+      ) : (
+        <LoginPage onAuthenticated={handleAuthenticated} />
+      )}
+    </ErrorBoundary>
+  );
 }

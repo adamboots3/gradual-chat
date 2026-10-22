@@ -6,13 +6,28 @@ import type { Channel, Message, MessagePreview, User } from '../types';
  * as entities — without it nested objects are written as empty stubs and the UI
  * crashes on the next read. These helpers add the discriminators back.
  */
-type Typed<T, Name extends string> = T & { __typename: Name };
+export type CachedUser = User & { __typename: 'User' };
+export type CachedPreview = Omit<MessagePreview, 'author'> & {
+  __typename: 'MessagePreview';
+  author: CachedUser;
+};
+export type CachedMessage = Omit<Message, 'author' | 'mentions' | 'replyTo'> & {
+  __typename: 'Message';
+  author: CachedUser;
+  mentions: CachedUser[];
+  replyTo: CachedPreview | null;
+};
+export type CachedChannel = Omit<Channel, 'members' | 'lastMessage'> & {
+  __typename: 'Channel';
+  members: CachedUser[];
+  lastMessage: CachedPreview | null;
+};
 
-export function cacheUser(user: User): Typed<User, 'User'> {
+export function cacheUser(user: User): CachedUser {
   return { __typename: 'User', ...user };
 }
 
-export function cachePreview(preview: MessagePreview): Typed<MessagePreview, 'MessagePreview'> {
+export function cachePreview(preview: MessagePreview): CachedPreview {
   return {
     __typename: 'MessagePreview',
     ...preview,
@@ -20,7 +35,7 @@ export function cachePreview(preview: MessagePreview): Typed<MessagePreview, 'Me
   };
 }
 
-export function cacheMessage(message: Message): Typed<Message, 'Message'> {
+export function cacheMessage(message: Message): CachedMessage {
   return {
     __typename: 'Message',
     ...message,
@@ -30,7 +45,7 @@ export function cacheMessage(message: Message): Typed<Message, 'Message'> {
   };
 }
 
-export function messageToPreview(message: Message): Typed<MessagePreview, 'MessagePreview'> {
+export function messageToPreview(message: Message): CachedPreview {
   return cachePreview({
     id: message.id,
     body: message.body,
@@ -39,15 +54,14 @@ export function messageToPreview(message: Message): Typed<MessagePreview, 'Messa
   });
 }
 
-export function patchChannel(
-  channel: Channel,
-  patch: Partial<Channel>,
-): Typed<Channel, 'Channel'> {
+export function patchChannel(channel: Channel, patch: Partial<Channel>): CachedChannel {
+  // Merge first, then normalise: a patched `lastMessage` must win over the
+  // channel's previous preview.
+  const merged = { ...channel, ...patch };
   return {
     __typename: 'Channel',
-    ...channel,
-    ...patch,
-    members: channel.members.map(cacheUser),
-    lastMessage: channel.lastMessage ? cachePreview(channel.lastMessage) : null,
+    ...merged,
+    members: merged.members.map(cacheUser),
+    lastMessage: merged.lastMessage ? cachePreview(merged.lastMessage) : null,
   };
 }

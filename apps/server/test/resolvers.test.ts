@@ -147,3 +147,90 @@ describe('GraphQL chat', () => {
     }
   });
 });
+
+describe('GraphQL message maintenance', () => {
+  async function sendAs(
+    user: Fixture['jenny'],
+    body: string,
+  ): Promise<{ id: string; body: string }> {
+    const response = await apollo.executeOperation(
+      {
+        query: `mutation($input: SendMessageInput!) { sendMessage(input: $input) { id body } }`,
+        variables: { input: { channelId: fx.channelId, body } },
+      },
+      { contextValue: contextFor(user) },
+    );
+    if (response.body.kind !== 'single') throw new Error('unexpected incremental result');
+    return response.body.singleResult.data?.sendMessage as { id: string; body: string };
+  }
+
+  it('suggests users for the mention picker', async () => {
+    const response = await apollo.executeOperation(
+      { query: `{ users(query: "dev") { username } }` },
+      { contextValue: contextFor(fx.jenny) },
+    );
+
+    if (response.body.kind === 'single') {
+      const users = response.body.singleResult.data?.users as Array<{ username: string }>;
+      expect(users.map((user) => user.username)).toContain('devon');
+    }
+  });
+
+  it('edits the author’s own message', async () => {
+    const sent = await sendAs(fx.jenny, 'typo');
+
+    const response = await apollo.executeOperation(
+      {
+        query: `mutation($id: ID!, $body: String!) { editMessage(id: $id, body: $body) { id body editedAt } }`,
+        variables: { id: sent.id, body: 'fixed' },
+      },
+      { contextValue: contextFor(fx.jenny) },
+    );
+
+    if (response.body.kind === 'single') {
+      const message = response.body.singleResult.data?.editMessage as {
+        body: string;
+        editedAt: string;
+      };
+      expect(message.body).toBe('fixed');
+      expect(message.editedAt).toBeTruthy();
+    }
+  });
+
+  it('refuses to edit somebody else’s message', async () => {
+    const sent = await sendAs(fx.jenny, 'mine');
+
+    const response = await apollo.executeOperation(
+      {
+        query: `mutation($id: ID!, $body: String!) { editMessage(id: $id, body: $body) { id } }`,
+        variables: { id: sent.id, body: 'hijacked' },
+      },
+      { contextValue: contextFor(fx.devon) },
+    );
+
+    if (response.body.kind === 'single') {
+      expect(response.body.singleResult.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('deletes the author’s own message and hides it from the timeline', async () => {
+    const sent = await sendAs(fx.jenny, 'oops');
+
+    const deleted = await apollo.executeOperation(
+      { query: `mutation($id: ID!) { deleteMessage(id: $id) { id } }`, variables: { id: sent.id } },
+      { contextValue: contextFor(fx.jenny) },
+    );
+    if (deleted.body.kind === 'single') {
+      expect(deleted.body.singleResult.data?.deleteMessage).toMatchObject({ id: sent.id });
+    }
+
+    const timeline = await apollo.executeOperation(
+      { query: `query($id: ID!) { messages(channelId: $id) { messages { id } } }`, variables: { id: fx.channelId } },
+      { contextValue: contextFor(fx.jenny) },
+    );
+    if (timeline.body.kind === 'single') {
+      const page = timeline.body.singleResult.data?.messages as { messages: Array<{ id: string }> };
+      expect(page.messages.map((message) => message.id)).not.toContain(sent.id);
+    }
+  });
+});

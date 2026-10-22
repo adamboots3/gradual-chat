@@ -1,11 +1,15 @@
-﻿/**
+/**
  * Dev-only smoke test for the realtime path.
  *
+ *   npm run dev                    # in another terminal
  *   node scripts/realtime-smoke.mjs
  *
  * Opens two isolated browser contexts (Jenny and Devon), sends a message from
- * one and asserts the other receives it 鈥?and that the unread badge appears when
+ * one and asserts the other receives it — and that the unread badge appears when
  * the recipient is looking at a different channel.
+ *
+ * Assertions poll `document.body.innerText` so they stay stable regardless of
+ * how React nests the text nodes.
  */
 import { chromium } from 'playwright-core';
 import { existsSync } from 'node:fs';
@@ -34,9 +38,17 @@ async function signIn(email) {
   await page.getByLabel('Password').fill('password123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'Account menu' }).waitFor();
-  await page.getByText('Share your story').first().waitFor();
+  // Wait until the history rendered: the messages query resolved and the socket
+  // has had a chance to join its channel rooms.
+  await page.waitForFunction(() => document.body.innerText.includes('Many thanks!'), null, {
+    timeout: 10000,
+  });
+  await page.waitForTimeout(800);
   return { context, page };
 }
+
+const waitForText = (page, text, timeout = 8000) =>
+  page.waitForFunction((value) => document.body.innerText.includes(value), text, { timeout });
 
 const jenny = await signIn('jenny@gradual.com');
 const devon = await signIn('devon@gradual.com');
@@ -46,8 +58,8 @@ await jenny.page.getByLabel(/Message Share your story/).fill(text);
 await jenny.page.getByLabel(/Message Share your story/).press('Enter');
 
 // 1. the other side receives it
-await devon.page.getByText(text).waitFor({ timeout: 5000 });
-console.log('鉁?message delivered to the other client');
+await waitForText(devon.page, text);
+console.log('OK message delivered to the other client');
 
 // 2. switch Devon away and check the unread badge appears
 await devon.page.getByRole('button', { name: 'Product team', exact: true }).click();
@@ -55,20 +67,23 @@ const second = `unread smoke ${Date.now()}`;
 await jenny.page.getByLabel(/Message Share your story/).fill(second);
 await jenny.page.getByLabel(/Message Share your story/).press('Enter');
 
-const row = devon.page.getByRole('button', { name: 'Share your story', exact: true });
-await row.waitFor();
-await row.locator('span.bg-badge').first().waitFor({ state: 'visible', timeout: 5000 });
-console.log('鉁?unread badge appears while the recipient is in another channel');
+await devon.page.waitForFunction(() => {
+  const row = document.querySelector('button[aria-label="Share your story"]');
+  return Boolean(row && row.querySelector('.bg-badge'));
+}, null, { timeout: 8000 });
+console.log('OK unread badge appears while the recipient is in another channel');
 
 // 3. opening the channel clears it
-await row.click();
-await devon.page.waitForTimeout(800);
-const badgeCount = await row.locator('span.bg-badge').count();
-if (badgeCount > 0) throw new Error('Unread badge should be cleared after opening the channel');
-console.log('鉁?unread badge clears after opening the channel');
+await devon.page.getByRole('button', { name: 'Share your story', exact: true }).click();
+await devon.page.waitForTimeout(1000);
+const badgeLeft = await devon.page.evaluate(() => {
+  const row = document.querySelector('button[aria-label="Share your story"]');
+  return Boolean(row && row.querySelector('.bg-badge'));
+});
+if (badgeLeft) throw new Error('Unread badge should be cleared after opening the channel');
+console.log('OK unread badge clears after opening the channel');
 
 await jenny.context.close();
 await devon.context.close();
 await browser.close();
 console.log('Realtime smoke test passed.');
-

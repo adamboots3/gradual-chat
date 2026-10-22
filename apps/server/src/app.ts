@@ -48,8 +48,17 @@ export function mountHttpRoutes(
     logger.info('no web build found — run `npm run dev` and open http://localhost:5173');
   }
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error({ err }, 'unhandled request error');
-    res.status(500).json({ errors: [{ message: 'Internal server error' }] });
-  });
+  app.use(
+    (err: Error & { status?: number; statusCode?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      const status = err.status ?? err.statusCode ?? 500;
+      if (status >= 500) {
+        logger.error({ err }, 'unhandled request error');
+        res.status(500).json({ errors: [{ message: 'Internal server error' }] });
+        return;
+      }
+      // Client errors (for example malformed JSON from body-parser) keep their status.
+      logger.warn(`request rejected with ${status}: ${err.message}`);
+      res.status(status).json({ errors: [{ message: err.message }] });
+    },
+  );
 }

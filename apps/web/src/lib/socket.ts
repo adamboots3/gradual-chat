@@ -13,6 +13,8 @@ export interface UnreadPayload {
 }
 
 export interface RealtimeHandlers {
+  /** Fired on the first connection and on every reconnect. */
+  onConnected?(): void;
   onMessage(message: Message): void;
   onMessageUpdated(message: Message): void;
   onMessageDeleted(payload: { messageId: string; channelId: string }): void;
@@ -37,6 +39,7 @@ export function connectRealtime(token: string, handlers: RealtimeHandlers): Real
     reconnectionDelay: 500,
   });
 
+  socket.on('connect', () => handlers.onConnected?.());
   socket.on('message:new', ({ message }: { message: Message }) => handlers.onMessage(message));
   socket.on('message:updated', ({ message }: { message: Message }) =>
     handlers.onMessageUpdated(message),

@@ -88,7 +88,10 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           />
 
           {error ? (
-            <p className="mt-3 rounded-lg border border-badge/40 bg-badge/10 px-3 py-2 text-[12px] text-badge">
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-badge/40 bg-badge/10 px-3 py-2 text-[12px] text-badge"
+            >
               {error}
             </p>
           ) : null}
