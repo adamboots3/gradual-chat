@@ -20,6 +20,7 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     MONGOMS_DISABLE_POSTINSTALL=1 \
+    MONGOMS_DOWNLOAD_DIR=/tmp/mongodb-binaries \
     PORT=4000
 
 COPY package.json package-lock.json ./
