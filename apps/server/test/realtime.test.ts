@@ -5,7 +5,7 @@ import { io as createClient, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { signAuthToken } from '../src/auth/jwt';
 import { createRealtime, type RealtimeServer } from '../src/realtime';
-import { sendMessage } from '../src/services/messages';
+import { editMessage, sendMessage } from '../src/services/messages';
 import { resetDatabase, startTestDatabase, type TestDatabase } from './helpers/db';
 import { createFixture, type Fixture } from './helpers/fixtures';
 
@@ -74,6 +74,25 @@ async function waitForRoom(room: string, socketId: string, timeout = 4000): Prom
 }
 
 describe('socket.io gateway', () => {
+  it('pushes updated mention badges when a message is edited', async () => {
+    const sent = await sendMessage(
+      { channelId: fx.channelId, body: 'hello' },
+      String(fx.jenny._id),
+    );
+    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
+    await waitFor(devon, 'connect');
+    await waitForRoom(`channel:${fx.channelId}`, String(devon.id));
+    const badgePromise = waitFor<{ unreadCount: number; unreadMentionCount: number }>(
+      devon,
+      'channel:unread',
+    );
+    const messagePromise = waitFor<{ message: { body: string } }>(devon, 'message:updated');
+    const edited = await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
+    await realtime.emitter.messageUpdated(edited);
+    expect((await messagePromise).message.body).toBe('hello @devon');
+    expect(await badgePromise).toMatchObject({ unreadCount: 1, unreadMentionCount: 1 });
+  });
+
   it('rejects a socket without a valid token', async () => {
     const client = connect();
     const error = await waitFor<Error>(client, 'connect_error');

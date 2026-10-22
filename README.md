@@ -98,7 +98,7 @@ instead of typing.
 | *(optional)* Unread count | ✅ Per-channel badges, @-mention markers, read cursors | `services/readState.ts` |
 | *(optional)* Quote reply model + API | ✅ Self-referencing `replyToId`, same-channel validation, quote UI | `services/messages.ts` |
 | *(optional)* Mention someone | ✅ Parsing, autocomplete, highlighting, mention counters | `services/mentions.ts` |
-| *(optional)* Frontend and backend unit tests | ✅ 105 tests (53 backend, 52 frontend) | `apps/*/test` |
+| *(optional)* Frontend and backend unit tests | ✅ 112 tests (56 backend, 56 frontend) | `apps/*/test` |
 
 A few things the brief did not ask for but that make the app feel finished: message pagination, soft deletes,
 edit support in the API, a message search filter, a `/healthz` endpoint, and a Docker image that serves the API
@@ -294,7 +294,7 @@ Current coverage: **83.6%** of backend statements/lines and **61.8%** of fronten
 (**83.5%** of branches) — the frontend number is dominated by layout-only components that have no
 behaviour of their own.
 
-**Backend (53 tests).** Each file boots its own in-memory MongoDB, so nothing touches a real database.
+**Backend (56 tests).** Each file boots its own in-memory MongoDB, so nothing touches a real database.
 
 - `mentions.test.ts` — parser edge cases: emails must not become mentions, handles stop at punctuation, case
   insensitivity, de-duplication.
@@ -312,7 +312,7 @@ behaviour of their own.
 - `resolvers.test.ts` — GraphQL layer through `executeOperation`: login failures, auth guards, unread in the
   channel list, `markChannelRead`, mentions, edit/delete permissions.
 
-**Frontend (52 tests)** with Testing Library:
+**Frontend (56 tests)** with Testing Library:
 
 - `MessageBody` — bold/italic/strike/code, mention highlighting, lists, and a regression test proving raw HTML is
   never injected.

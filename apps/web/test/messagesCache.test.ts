@@ -1,6 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { createCache } from '../src/lib/apollo';
 import { MESSAGES } from '../src/graphql/operations';
+import { removeCachedMessage } from '../src/lib/cache';
 
 const author = {
   __typename: 'User',
@@ -30,6 +31,33 @@ function node(id: string) {
  * actually prepend older pages instead of replacing the view.
  */
 describe('messages field policy', () => {
+  it('removes a deleted message from its channel while preserving another cached timeline', () => {
+    const cache = createCache();
+    for (const channelId of ['c1', 'c2']) {
+      cache.writeQuery({
+        query: MESSAGES,
+        variables: { channelId },
+        data: {
+          messages: {
+            __typename: 'MessagePage',
+            messages: [{ ...node(`${channelId}-message`), channelId }],
+            nextCursor: 'older',
+          },
+        },
+      });
+    }
+    removeCachedMessage(cache, 'c1-message', 'c1');
+    const read = (channelId: string) =>
+      cache.readQuery<{
+        messages: { messages: Array<{ id: string }>; nextCursor: string | null };
+      }>({ query: MESSAGES, variables: { channelId } });
+    expect(read('c1')?.messages.messages).toEqual([]);
+    expect(read('c1')?.messages.nextCursor).toBe('older');
+    expect(read('c2')?.messages.messages.map((message) => message.id)).toEqual(['c2-message']);
+    removeCachedMessage(cache, 'missing', 'uncached-channel');
+    expect(read('uncached-channel')).toBeNull();
+  });
+
   it('prepends a page fetched with a cursor', () => {
     const cache = createCache();
 
@@ -96,6 +124,3 @@ describe('messages field policy', () => {
     expect(read?.messages.messages.map((message) => message.id)).toEqual(['fresh']);
   });
 });
-
-
-

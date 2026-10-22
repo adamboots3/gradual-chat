@@ -98,6 +98,7 @@ export async function createRealtime(httpServer: HttpServer): Promise<RealtimeSe
     },
     async messageUpdated(result: MessageEvent) {
       io.to(`channel:${result.channelId}`).emit('message:updated', { message: result.message });
+      await broadcastBadges(result.channelId, result.memberIds);
     },
     async messageDeleted(result: MessageEvent) {
       io.to(`channel:${result.channelId}`).emit('message:deleted', {

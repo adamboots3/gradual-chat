@@ -1,4 +1,25 @@
 import type { Channel, Message, MessagePreview, User } from '../types';
+import type { ApolloCache } from '@apollo/client';
+import { MESSAGES } from '../graphql/operations';
+
+export function removeCachedMessage(
+  cache: ApolloCache<unknown>,
+  messageId: string,
+  channelId: string,
+): void {
+  cache.updateQuery<{ messages: { messages: Message[]; nextCursor: string | null } }>(
+    { query: MESSAGES, variables: { channelId } },
+    (data) =>
+      data
+        ? {
+            messages: {
+              ...data.messages,
+              messages: data.messages.messages.filter((message) => message.id !== messageId),
+            },
+          }
+        : data,
+  );
+}
 
 /**
  * Objects that arrive over socket.io never went through a GraphQL document, so

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Message } from '../src/models/Message';
 import { ReadState } from '../src/models/ReadState';
 import { listChannelsForUser } from '../src/services/channels';
-import { deleteMessage, listMessages, sendMessage } from '../src/services/messages';
+import { deleteMessage, editMessage, listMessages, sendMessage } from '../src/services/messages';
 import { markChannelRead } from '../src/services/readState';
 import { resetDatabase, startTestDatabase, type TestDatabase } from './helpers/db';
 import { createFixture, type Fixture } from './helpers/fixtures';
@@ -108,6 +108,32 @@ describe('sendMessage', () => {
 });
 
 describe('unread bookkeeping', () => {
+  it('adjusts mention badges on edit without changing message unread counts', async () => {
+    const sent = await sendMessage(
+      { channelId: fx.channelId, body: 'hello @devon' },
+      String(fx.jenny._id),
+    );
+    await editMessage(sent.message.id, 'hello @grace', String(fx.jenny._id));
+    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(0);
+    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(1);
+    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
+    await editMessage(sent.message.id, 'hello @grace again', String(fx.jenny._id));
+    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(1);
+    await deleteMessage(sent.message.id, String(fx.jenny._id));
+    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(0);
+  });
+
+  it('does not add a mention badge when editing an already read message', async () => {
+    const sent = await sendMessage(
+      { channelId: fx.channelId, body: 'hello' },
+      String(fx.jenny._id),
+    );
+    await markChannelRead(fx.channelId, String(fx.devon._id));
+    await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
+    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(0);
+    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
+  });
+
   it('clears the counters when the channel is read', async () => {
     await sendMessage({ channelId: fx.channelId, body: 'hello @devon' }, String(fx.jenny._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
@@ -118,10 +144,7 @@ describe('unread bookkeeping', () => {
   });
 
   it('decrements unread when an unread message is deleted', async () => {
-    const sent = await sendMessage(
-      { channelId: fx.channelId, body: 'oops' },
-      String(fx.jenny._id),
-    );
+    const sent = await sendMessage({ channelId: fx.channelId, body: 'oops' }, String(fx.jenny._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
 
     await deleteMessage(sent.message.id, String(fx.jenny._id));
@@ -154,20 +177,14 @@ describe('listMessages', () => {
     }
 
     const first = await listMessages({ channelId: fx.channelId, limit: 2 }, String(fx.jenny._id));
-    expect(first.messages.map((message) => message.body)).toEqual([
-      'message 3',
-      'message 4',
-    ]);
+    expect(first.messages.map((message) => message.body)).toEqual(['message 3', 'message 4']);
     expect(first.nextCursor).toBeTruthy();
 
     const second = await listMessages(
       { channelId: fx.channelId, limit: 2, cursor: first.nextCursor },
       String(fx.jenny._id),
     );
-    expect(second.messages.map((message) => message.body)).toEqual([
-      'message 1',
-      'message 2',
-    ]);
+    expect(second.messages.map((message) => message.body)).toEqual(['message 1', 'message 2']);
 
     const third = await listMessages(
       { channelId: fx.channelId, limit: 2, cursor: second.nextCursor },
@@ -178,10 +195,7 @@ describe('listMessages', () => {
   });
 
   it('hides deleted messages', async () => {
-    const sent = await sendMessage(
-      { channelId: fx.channelId, body: 'gone' },
-      String(fx.jenny._id),
-    );
+    const sent = await sendMessage({ channelId: fx.channelId, body: 'gone' }, String(fx.jenny._id));
     await deleteMessage(sent.message.id, String(fx.jenny._id));
 
     const page = await listMessages({ channelId: fx.channelId }, String(fx.jenny._id));

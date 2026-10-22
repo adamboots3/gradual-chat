@@ -147,10 +147,33 @@ export async function editMessage(
     throw forbidden('You can only edit your own messages.');
   }
 
+  const previousMentionIds = message.mentionIds.map(String);
   message.body = trimmed;
   message.editedAt = new Date();
   message.mentionIds = await resolveMentionIds(trimmed, userId);
   await message.save();
+
+  const nextMentionIds = message.mentionIds.map(String);
+  const added = nextMentionIds.filter((id) => !previousMentionIds.includes(id));
+  const removed = previousMentionIds.filter((id) => !nextMentionIds.includes(id));
+  // Only messages still unread contribute to a member's mention badge.
+  const unreadFilter = {
+    channelId: message.channelId,
+    lastReadAt: { $lt: message.createdAt },
+    unreadCount: { $gt: 0 },
+  };
+  if (added.length > 0) {
+    await ReadState.updateMany(
+      { ...unreadFilter, userId: { $in: added } },
+      { $inc: { unreadMentionCount: 1 } },
+    );
+  }
+  if (removed.length > 0) {
+    await ReadState.updateMany(
+      { ...unreadFilter, userId: { $in: removed }, unreadMentionCount: { $gt: 0 } },
+      { $inc: { unreadMentionCount: -1 } },
+    );
+  }
 
   const channel = await Channel.findById(message.channelId);
 

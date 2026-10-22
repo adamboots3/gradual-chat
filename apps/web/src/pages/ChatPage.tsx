@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import type { Socket } from 'socket.io-client';
-import { CHANNELS, DELETE_MESSAGE, MARK_CHANNEL_READ, ME, MESSAGES, SEND_MESSAGE } from '../graphql/operations';
+import {
+  CHANNELS,
+  DELETE_MESSAGE,
+  MARK_CHANNEL_READ,
+  ME,
+  MESSAGES,
+  SEND_MESSAGE,
+} from '../graphql/operations';
 import type { Channel, Message, User } from '../types';
 import { TopBar } from '../components/TopBar';
 import { SideRail } from '../components/SideRail';
@@ -10,7 +17,7 @@ import { ChatHeader } from '../components/ChatHeader';
 import { MessageList } from '../components/MessageList';
 import { Composer } from '../components/Composer';
 import { connectRealtime, type RealtimeClient } from '../lib/socket';
-import { cacheMessage, messageToPreview, patchChannel } from '../lib/cache';
+import { cacheMessage, messageToPreview, patchChannel, removeCachedMessage } from '../lib/cache';
 
 interface MessagesData {
   messages: { messages: Message[]; nextCursor: string | null };
@@ -101,19 +108,8 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   );
 
   const removeMessage = useCallback(
-    (messageId: string) => {
-      client.cache.updateQuery<MessagesData, MessagesVars>(
-        { query: MESSAGES, variables: { channelId: activeIdRef.current ?? '' } },
-        (data) => {
-          if (!data) return data;
-          return {
-            messages: {
-              ...data.messages,
-              messages: data.messages.messages.filter((item) => item.id !== messageId),
-            },
-          };
-        },
-      );
+    (messageId: string, channelId: string) => {
+      removeCachedMessage(client.cache, messageId, channelId);
     },
     [client],
   );
@@ -169,7 +165,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
         );
       },
       onMessageDeleted(payload) {
-        removeMessage(payload.messageId);
+        removeMessage(payload.messageId, payload.channelId);
         void client.refetchQueries({ include: [CHANNELS] });
       },
       onUnread(payload) {
@@ -230,7 +226,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   const handleDelete = async (message: Message) => {
     if (!window.confirm('Delete this message?')) return;
     await deleteMessage({ variables: { id: message.id } });
-    removeMessage(message.id);
+    removeMessage(message.id, message.channelId);
     void client.refetchQueries({ include: [CHANNELS] });
   };
 

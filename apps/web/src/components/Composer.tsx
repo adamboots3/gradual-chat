@@ -62,6 +62,8 @@ export function Composer({
   const [highlight, setHighlight] = useState(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [searchUsers, { data: mentionData }] = useLazyQuery<{ users: User[] }, { query: string }>(
@@ -69,7 +71,7 @@ export function Composer({
     { fetchPolicy: 'cache-first' },
   );
 
-  const suggestions = mentionData?.users ?? [];
+  const suggestions = (mentionData?.users ?? []).slice(0, 6);
 
   const updateMentionState = (value: string, caret: number) => {
     const before = value.slice(0, caret);
@@ -100,7 +102,8 @@ export function Composer({
     if (!element) return;
     const { selectionStart, selectionEnd } = element;
     const selected = text.slice(selectionStart, selectionEnd) || placeholder;
-    const next = text.slice(0, selectionStart) + marker + selected + marker + text.slice(selectionEnd);
+    const next =
+      text.slice(0, selectionStart) + marker + selected + marker + text.slice(selectionEnd);
     setText(next);
     requestAnimationFrame(() => {
       element.focus();
@@ -145,6 +148,7 @@ export function Composer({
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
+    setSendError(null);
     try {
       await onSend(body, replyTo?.id ?? null);
       setText('');
@@ -152,12 +156,17 @@ export function Composer({
       onStopTyping();
       const element = textareaRef.current;
       if (element) element.style.height = 'auto';
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : 'Could not send message. Please try again.',
+      );
     } finally {
       setSending(false);
     }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (composingRef.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (mention && suggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -195,7 +204,7 @@ export function Composer({
           role="listbox"
           aria-label="Mention suggestions"
         >
-          {suggestions.slice(0, 6).map((user, index) => (
+          {suggestions.map((user, index) => (
             <button
               key={user.id}
               type="button"
@@ -282,12 +291,24 @@ export function Composer({
         disabled={disabled}
         onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
         onKeyDown={onKeyDown}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          composingRef.current = false;
+        }}
         onClick={(event) => updateMentionState(text, event.currentTarget.selectionStart)}
         onBlur={onStopTyping}
         placeholder={`Message ${channelName}`}
         aria-label={`Message ${channelName}`}
         className="max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-content placeholder:text-muted focus:outline-none disabled:opacity-60"
       />
+
+      {sendError ? (
+        <p role="alert" className="mt-1 text-[12px] text-badge">
+          {sendError}
+        </p>
+      ) : null}
 
       {replyTo ? (
         <div className="mt-1">
