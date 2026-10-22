@@ -1,5 +1,7 @@
 # Gradual Community — realtime chat
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A Slack-style chat application built for the **Full Stack Developer Assignment**: React + TypeScript on the
 front end, Node + TypeScript + Apollo GraphQL + MongoDB on the back end, with socket.io for realtime delivery.
 
