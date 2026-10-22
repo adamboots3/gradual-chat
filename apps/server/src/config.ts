@@ -20,9 +20,9 @@ export const config = {
    * instance first and only falls back to an in-memory MongoDB when it is
    * unreachable (see `connectDatabase`).
    */
-  mongoUri: process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/gradual_chat',
+  mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/gradual_chat',
   mongoUriExplicit: Boolean(process.env.MONGODB_URI),
-  jwtSecret: process.env.JWT_SECRET ?? 'gradual-dev-secret-do-not-use-in-production',
+  jwtSecret: process.env.JWT_SECRET || 'gradual-dev-secret-do-not-use-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   seedOnStart: readBool(process.env.SEED_ON_START, true),
   logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'test' ? 'silent' : 'info'),
