@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { User } from '../types';
 import { Avatar } from './Avatar';
-import { BellIcon, ChevronDownIcon, HelpIcon, LogoutIcon, SearchIcon } from './icons';
+import { BellIcon, ChevronDownIcon, HelpIcon, LogoutIcon } from './icons';
 
 interface TopBarProps {
   me: User;
@@ -29,16 +29,6 @@ export function TopBar({ me, onSignOut }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="flex h-9 w-[190px] items-center gap-2 rounded-lg bg-[#1C1B22] px-3 text-[13px] text-muted ring-1 ring-white/5 focus-within:ring-white/15">
-          <SearchIcon className="h-4 w-4" />
-          <input
-            type="search"
-            placeholder="Search"
-            className="w-full bg-transparent text-content placeholder:text-muted focus:outline-none"
-            aria-label="Search"
-          />
-        </label>
-
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition hover:bg-white/5 hover:text-content"

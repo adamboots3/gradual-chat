@@ -13,11 +13,10 @@ const me: User = {
 };
 
 describe('TopBar', () => {
-  it('shows the workspace name and search box', () => {
+  it('shows the workspace name', () => {
     render(<TopBar me={me} onSignOut={vi.fn()} />);
 
     expect(screen.getByText('Gradual Community')).toBeInTheDocument();
-    expect(screen.getByLabelText('Search')).toBeInTheDocument();
   });
 
   it('opens the account menu and signs out', async () => {
