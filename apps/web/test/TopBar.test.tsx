@@ -18,7 +18,6 @@ describe('TopBar', () => {
 
     expect(screen.getByText('Gradual Community')).toBeInTheDocument();
     expect(screen.getByLabelText('Search')).toBeInTheDocument();
-    expect(screen.getByText('UTC-05:00 Chicago')).toBeInTheDocument();
   });
 
   it('opens the account menu and signs out', async () => {

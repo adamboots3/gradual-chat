@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { User } from '../types';
 import { Avatar } from './Avatar';
-import { BellIcon, ChevronDownIcon, GlobeIcon, HelpIcon, LogoutIcon, SearchIcon } from './icons';
+import { BellIcon, ChevronDownIcon, HelpIcon, LogoutIcon, SearchIcon } from './icons';
 
 interface TopBarProps {
   me: User;
@@ -38,11 +38,6 @@ export function TopBar({ me, onSignOut }: TopBarProps) {
             aria-label="Search"
           />
         </label>
-
-        <span className="ml-1 hidden items-center gap-1.5 text-[13px] text-muted sm:flex">
-          <GlobeIcon className="h-4 w-4" />
-          UTC-05:00 Chicago
-        </span>
 
         <button
           type="button"
