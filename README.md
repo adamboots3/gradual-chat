@@ -2,11 +2,10 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-A Slack-style chat application built for the **Full Stack Developer Assignment**: React + TypeScript on the
-front end, Node + TypeScript + Apollo GraphQL + MongoDB on the back end, with socket.io for realtime delivery.
+A realtime chat application built with React + TypeScript on the front end, Node.js + TypeScript,
+Apollo GraphQL and MongoDB on the back end, and Socket.IO for realtime delivery.
 
-Everything in the brief is implemented — including all four optional items (unread counts, quote replies,
-@mentions, and unit tests on both sides).
+Supports channel conversations, unread message counts, quote replies and @mentions, with frontend and backend tests.
 
 ![Conversation view](docs/screenshots/01-conversation.png)
 
@@ -102,20 +101,20 @@ to prefill the form before pressing **Sign in**. The page lists three example ac
 
 ## What is implemented
 
-| Assignment requirement                       | Status                                                                                    | Where to look                                |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Web UI following the design                  | ✅ Four designed states reproduced (default, hover actions, quote reply, @mention picker) | `apps/web/src/components`, screenshots below |
-| Realtime chat with socket.io                 | ✅ Per-channel rooms and per-user unread updates                                          | `apps/server/src/realtime`                   |
-| MongoDB                                      | ✅ Mongoose models, compound indexes, denormalised unread counters                        | `apps/server/src/models`                     |
-| Node.js (TypeScript)                         | ✅ Node 22, strict TypeScript, Express + Apollo                                           | `apps/server`                                |
-| GraphQL                                      | ✅ Schema-first API for every read and write                                              | `apps/server/src/graphql/schema.graphql`     |
-| React.js (TypeScript)                        | ✅ React 18 + Vite + Apollo Client + Tailwind                                             | `apps/web`                                   |
-| _(optional)_ Unread count                    | ✅ Per-channel message badges and read cursors                                            | `apps/server/src/services/readState.ts`      |
-| _(optional)_ Quote reply model + API         | ✅ Self-referencing `replyToId`, same-channel validation, quote UI                        | `apps/server/src/services/messages.ts`       |
-| _(optional)_ Mention someone                 | ✅ Parsing, autocomplete and highlighting                                                 | `apps/server/src/services/mentions.ts`       |
-| _(optional)_ Frontend and backend unit tests | ✅ 109 tests (50 backend, 59 frontend)                                                    | `apps/*/test`                                |
+| Feature or technology        | Implementation                                                       | Code                                         |
+| ---------------------------- | -------------------------------------------------------------------- | -------------------------------------------- |
+| Chat interface               | ✅ Conversations, message actions, quote replies and @mention picker | `apps/web/src/components`, screenshots below |
+| Realtime chat with socket.io | ✅ Per-channel rooms and per-user unread updates                     | `apps/server/src/realtime`                   |
+| MongoDB                      | ✅ Mongoose models, compound indexes, denormalised unread counters   | `apps/server/src/models`                     |
+| Node.js (TypeScript)         | ✅ Node 22, strict TypeScript, Express + Apollo                      | `apps/server`                                |
+| GraphQL                      | ✅ Schema-first API for every read and write                         | `apps/server/src/graphql/schema.graphql`     |
+| React.js (TypeScript)        | ✅ React 18 + Vite + Apollo Client + Tailwind                        | `apps/web`                                   |
+| Unread message counts        | ✅ Per-channel message badges and read cursors                       | `apps/server/src/services/readState.ts`      |
+| Quote replies                | ✅ Self-referencing `replyToId`, same-channel validation, quote UI   | `apps/server/src/services/messages.ts`       |
+| @mentions                    | ✅ Parsing, autocomplete and highlighting                            | `apps/server/src/services/mentions.ts`       |
+| Frontend and backend tests   | ✅ 109 tests (50 backend, 59 frontend)                               | `apps/*/test`                                |
 
-A few things the brief did not ask for but that make the app feel finished: message pagination, soft deletes,
+Additional features include message pagination, soft deletes,
 edit support in the API (no edit UI), a conversation-list filter, a `/healthz` endpoint, and a Docker image that serves the API
 and the SPA from one origin (so there is no CORS setup at all).
 
@@ -404,6 +403,6 @@ Development tools also accept `API_PROXY_TARGET` (Vite API proxy target, default
   with no separate unread mention badge. Typing-status events and indicators are not implemented.
 - **Quote deletion.** Soft-deleted messages disappear from the timeline; existing quote previews retain their text.
 - **Demo login.** Only the selected user ID is stored in `localStorage`; passwords are checked at login and
-  never stored in the browser. This assignment version intentionally omits request authentication and access control.
+  never stored in the browser. Subsequent requests do not use authentication or access control.
 - **Unread reconciliation.** Counters are maintained incrementally; a background job recomputing them from
   `lastReadAt` would be the safety net in production.

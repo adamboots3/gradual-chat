@@ -2,9 +2,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-为 Full Stack Developer Assignment 开发的 Slack 风格聊天应用。前端使用 React + TypeScript，后端使用 Node.js + TypeScript、Apollo GraphQL 和 MongoDB，通过 Socket.IO 实现实时消息推送。
+一个实时聊天应用。前端使用 React + TypeScript，后端使用 Node.js + TypeScript、Apollo GraphQL 和 MongoDB，通过 Socket.IO 实现实时消息推送。
 
-已实现题目要求的聊天界面、实时聊天，以及四项可选功能：未读计数、引用回复、@提及、前后端测试。
+支持频道会话、未读消息计数、引用回复和 @提及，并包含前后端测试。
 
 ![聊天界面](docs/screenshots/01-conversation.png)
 
@@ -93,18 +93,18 @@ Docker Compose：执行 `docker compose exec app node apps/server/dist/seed/cli.
 
 ## 功能清单
 
-| 题目要求              | 实现情况                                        | 主要代码位置                             |
-| --------------------- | ----------------------------------------------- | ---------------------------------------- |
-| 按设计实现 Web UI     | 已实现会话、悬停操作、引用回复、@候选列表等状态 | `apps/web/src/components`                |
-| 实时聊天              | Socket.IO、频道房间、个人未读数推送             | `apps/server/src/realtime`               |
-| React.js + TypeScript | React 18、Vite、Apollo Client、Tailwind         | `apps/web`                               |
-| Node.js + TypeScript  | Express、Apollo Server、严格类型检查            | `apps/server`                            |
-| MongoDB               | Mongoose 模型、复合索引、未读计数               | `apps/server/src/models`                 |
-| GraphQL               | 使用 SDL 定义查询与变更接口                     | `apps/server/src/graphql/schema.graphql` |
-| 可选：未读数          | 频道未读消息徽标、已读状态                      | `apps/server/src/services/readState.ts`  |
-| 可选：引用回复        | 消息自引用、同频道校验、引用预览                | `apps/server/src/services/messages.ts`   |
-| 可选：@提及           | 解析、自动补全、高亮                            | `apps/server/src/services/mentions.ts`   |
-| 可选：前后端测试      | 109 个测试，后端 50 个、前端 59 个              | `apps/server/test`、`apps/web/test`      |
+| 功能或技术            | 实现方式                                | 主要代码位置                             |
+| --------------------- | --------------------------------------- | ---------------------------------------- |
+| 聊天界面              | 会话、消息操作、引用回复、@候选列表     | `apps/web/src/components`                |
+| 实时聊天              | Socket.IO、频道房间、个人未读数推送     | `apps/server/src/realtime`               |
+| React.js + TypeScript | React 18、Vite、Apollo Client、Tailwind | `apps/web`                               |
+| Node.js + TypeScript  | Express、Apollo Server、严格类型检查    | `apps/server`                            |
+| MongoDB               | Mongoose 模型、复合索引、未读计数       | `apps/server/src/models`                 |
+| GraphQL               | 使用 SDL 定义查询与变更接口             | `apps/server/src/graphql/schema.graphql` |
+| 未读消息数            | 频道未读消息徽标、已读状态              | `apps/server/src/services/readState.ts`  |
+| 引用回复              | 消息自引用、同频道校验、引用预览        | `apps/server/src/services/messages.ts`   |
+| @提及                 | 解析、自动补全、高亮                    | `apps/server/src/services/mentions.ts`   |
+| 前后端测试            | 109 个测试，后端 50 个、前端 59 个      | `apps/server/test`、`apps/web/test`      |
 
 此外还提供消息分页、软删除、消息编辑 API、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。消息编辑目前通过 API 提供，前端未提供编辑入口。
 

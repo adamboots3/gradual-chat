@@ -2,7 +2,7 @@
   "name": "gradual-chat",
   "version": "1.0.0",
   "private": true,
-  "description": "A Slack-style realtime chat app built with React, Apollo GraphQL, socket.io and MongoDB.",
+  "description": "A realtime chat app built with React, TypeScript, GraphQL, Socket.IO and MongoDB.",
   "license": "MIT",
   "workspaces": [
     "apps/*"
