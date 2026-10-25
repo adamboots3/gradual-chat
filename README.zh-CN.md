@@ -6,6 +6,8 @@
 
 支持频道会话、未读消息计数、引用回复和 @提及，并包含前后端测试。
 
+https://github.com/user-attachments/assets/71c3699d-d0cb-43e6-b57b-1e6cbfcd651f
+
 ## 目录
 
 - [快速启动](#快速启动)
