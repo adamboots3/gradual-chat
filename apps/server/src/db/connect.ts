@@ -44,7 +44,7 @@ export async function connectDatabase(uri = config.mongoUri): Promise<DatabaseCo
     logger.warn(
       `No MongoDB reachable at ${uri} — starting an in-memory MongoDB instead. ` +
         'Data will NOT persist after a restart. ' +
-        'Run `docker compose up -d mongo` or set MONGODB_URI for a real database.',
+        'Set MONGODB_URI to a persistent database, or run the full stack with `docker compose up --build`.',
     );
   }
 

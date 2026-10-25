@@ -43,14 +43,7 @@ export interface SendMessageInput {
   replyToId?: string | null;
 }
 
-export interface SendMessageResult extends MessageEvent {
-  mentionIds: string[];
-}
-
-export async function sendMessage(
-  input: SendMessageInput,
-  userId: string,
-): Promise<SendMessageResult> {
+export async function sendMessage(input: SendMessageInput, userId: string): Promise<MessageEvent> {
   const channel = await getChannel(input.channelId);
   if (!Types.ObjectId.isValid(userId) || !(await User.exists({ _id: userId }))) {
     throw notFound('User not found.');
@@ -92,7 +85,6 @@ export async function sendMessage(
     message,
     channelId: String(channel._id),
     memberIds: channel.memberIds.map(String),
-    mentionIds: mentionIds.map(String),
   };
 }
 
@@ -135,6 +127,8 @@ export type MessageMutationResult = MessageEvent;
 export async function editMessage(messageId: string, body: string): Promise<MessageMutationResult> {
   const trimmed = body.trim();
   if (trimmed.length === 0) throw badUserInput('Message cannot be empty.');
+  if (trimmed.length > 4000) throw badUserInput('Message is too long (max 4000 characters).');
+  if (!Types.ObjectId.isValid(messageId)) throw notFound('Message not found.');
 
   const message = await Message.findOne({ _id: messageId, deletedAt: null });
   if (!message) throw notFound('Message not found.');
@@ -153,6 +147,7 @@ export async function editMessage(messageId: string, body: string): Promise<Mess
 }
 
 export async function deleteMessage(messageId: string): Promise<MessageMutationResult> {
+  if (!Types.ObjectId.isValid(messageId)) throw notFound('Message not found.');
   const message = await Message.findOne({ _id: messageId, deletedAt: null });
   if (!message) throw notFound('Message not found.');
   const channelId = message.channelId;

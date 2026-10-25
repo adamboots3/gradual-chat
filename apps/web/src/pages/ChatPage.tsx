@@ -16,7 +16,13 @@ import { ChatHeader } from '../components/ChatHeader';
 import { MessageList } from '../components/MessageList';
 import { Composer } from '../components/Composer';
 import { connectRealtime, type RealtimeClient } from '../lib/socket';
-import { cacheMessage, messageToPreview, patchChannel, removeCachedMessage } from '../lib/cache';
+import {
+  cacheMessage,
+  messageToPreview,
+  patchChannel,
+  removeCachedMessage,
+  updateCachedPreview,
+} from '../lib/cache';
 
 interface MessagesData {
   messages: { messages: Message[]; nextCursor: string | null };
@@ -154,6 +160,7 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
         }
       },
       onMessageUpdated(message) {
+        updateCachedPreview(client.cache, message);
         const updated = cacheMessage(message);
         client.cache.updateQuery<MessagesData, MessagesVars>(
           { query: MESSAGES, variables: { channelId: updated.channelId } },

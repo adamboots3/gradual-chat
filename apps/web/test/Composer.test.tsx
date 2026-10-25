@@ -160,4 +160,63 @@ describe('Composer', () => {
 
     expect(input).toHaveValue('make me **bold**');
   });
+
+  it('inserts a mention at the caret rather than at the end of the draft', async () => {
+    render(
+      <MockedProvider
+        mocks={[
+          {
+            request: { query: SEARCH_USERS, variables: { query: '' } },
+            result: {
+              data: {
+                users: [
+                  {
+                    __typename: 'User',
+                    id: 'u2',
+                    name: 'Devon Lane',
+                    username: 'devon',
+                    avatarColor: '#F2B8A2',
+                    title: '',
+                  },
+                ],
+              },
+            },
+          },
+        ]}
+      >
+        <Composer
+          channelName="Share your story"
+          replyTo={null}
+          onCancelReply={vi.fn()}
+          onSend={vi.fn()}
+        />
+      </MockedProvider>,
+    );
+    const input = screen.getByLabelText('Message Share your story') as HTMLTextAreaElement;
+    await userEvent.type(input, 'hello team');
+    input.setSelectionRange(6, 6);
+    await userEvent.click(screen.getByRole('button', { name: 'Mention someone' }));
+    await screen.findByRole('listbox');
+    await userEvent.keyboard('{Enter}');
+    expect(input).toHaveValue('hello @devon team');
+  });
+
+  it('prevents changes to the draft while sending', async () => {
+    let finishSend!: () => void;
+    const onSend = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSend = resolve;
+        }),
+    );
+    renderComposer({ onSend });
+    const input = screen.getByLabelText('Message Share your story');
+    await userEvent.type(input, 'pending message');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(input).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    finishSend();
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(input).toHaveValue('');
+  });
 });

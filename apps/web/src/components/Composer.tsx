@@ -135,7 +135,7 @@ export function Composer({ channelName, replyTo, onCancelReply, onSend, disabled
 
   const submit = async () => {
     const body = text.trim();
-    if (!body || sending) return;
+    if (!body || sending || disabled) return;
     setSending(true);
     setSendError(null);
     try {
@@ -263,9 +263,12 @@ export function Composer({ channelName, replyTo, onCancelReply, onSend, disabled
         <ToolbarButton
           label="Mention someone"
           onClick={() => {
-            insertAtCaret('@');
             const element = textareaRef.current;
-            if (element) updateMentionState(`${text}@`, text.length + 1);
+            const start = element?.selectionStart ?? text.length;
+            const end = element?.selectionEnd ?? text.length;
+            const value = `${text.slice(0, start)}@${text.slice(end)}`;
+            insertAtCaret('@');
+            updateMentionState(value, start + 1);
           }}
         >
           <AtIcon className="h-4 w-4" />
@@ -276,7 +279,7 @@ export function Composer({ channelName, replyTo, onCancelReply, onSend, disabled
         ref={textareaRef}
         value={text}
         rows={1}
-        disabled={disabled}
+        disabled={disabled || sending}
         onChange={(event) => handleChange(event.target.value, event.target.selectionStart)}
         onKeyDown={onKeyDown}
         onCompositionStart={() => {
@@ -312,7 +315,7 @@ export function Composer({ channelName, replyTo, onCancelReply, onSend, disabled
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={!text.trim() || sending}
+          disabled={disabled || !text.trim() || sending}
           className="ml-auto flex h-8 items-center gap-1.5 rounded-lg bg-accent/90 px-3 text-[13px] font-semibold text-ink transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
           <SendIcon className="h-4 w-4" />

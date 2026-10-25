@@ -13,7 +13,6 @@ const channelSchema = new Schema(
     slug: { type: String, required: true, unique: true, trim: true },
     type: { type: String, enum: ['channel', 'dm'], default: 'channel' },
     memberIds: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
-    isPrivate: { type: Boolean, default: false },
     order: { type: Number, default: 0 },
   },
   { timestamps: true },
@@ -25,4 +24,5 @@ export type ChannelAttributes = InferSchemaType<typeof channelSchema>;
 export type ChannelDocument = HydratedDocument<ChannelAttributes>;
 
 export const Channel: Model<ChannelAttributes> =
-  (models.Channel as Model<ChannelAttributes>) ?? model<ChannelAttributes>('Channel', channelSchema);
+  (models.Channel as Model<ChannelAttributes>) ??
+  model<ChannelAttributes>('Channel', channelSchema);

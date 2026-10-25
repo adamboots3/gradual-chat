@@ -16,7 +16,7 @@
     "dev:web": "npm run dev --workspace @gradual/web",
     "build": "npm run build --workspace @gradual/server && npm run build --workspace @gradual/web",
     "start": "npm run start --workspace @gradual/server",
-    "seed": "npm run seed --workspace @gradual/server",
+    "seed": "npm run seed --workspace @gradual/server --",
     "test": "npm run test --workspace @gradual/server && npm run test --workspace @gradual/web",
     "test:coverage": "npm run test:coverage --workspace @gradual/server && npm run test:coverage --workspace @gradual/web",
     "typecheck": "npm run typecheck --workspace @gradual/server && npm run typecheck --workspace @gradual/web",

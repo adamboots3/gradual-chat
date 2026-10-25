@@ -29,4 +29,5 @@ export type MessageAttributes = InferSchemaType<typeof messageSchema>;
 export type MessageDocument = HydratedDocument<MessageAttributes>;
 
 export const Message: Model<MessageAttributes> =
-  (models.Message as Model<MessageAttributes>) ?? model<MessageAttributes>('Message', messageSchema);
+  (models.Message as Model<MessageAttributes>) ??
+  model<MessageAttributes>('Message', messageSchema);

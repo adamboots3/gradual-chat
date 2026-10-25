@@ -52,6 +52,7 @@ function buildChannelDTO(
 }
 
 export async function listChannelsForUser(userId: string): Promise<ChannelDTO[]> {
+  if (!Types.ObjectId.isValid(userId)) throw notFound('User not found.');
   const channels = await Channel.find({ memberIds: userId })
     .sort({ order: 1, _id: 1 })
     .populate('memberIds', POPULATE_MEMBERS);

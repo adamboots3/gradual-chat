@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { createCache } from '../src/lib/apollo';
 import { MESSAGES } from '../src/graphql/operations';
-import { removeCachedMessage } from '../src/lib/cache';
+import { removeCachedMessage, updateCachedPreview } from '../src/lib/cache';
 
 const author = {
   __typename: 'User',
@@ -31,6 +31,38 @@ function node(id: string) {
  * actually prepend older pages instead of replacing the view.
  */
 describe('messages field policy', () => {
+  it('refreshes an existing quote preview when its source message is edited', () => {
+    const cache = createCache();
+    cache.writeQuery({
+      query: MESSAGES,
+      variables: { channelId: 'c1' },
+      data: {
+        messages: {
+          __typename: 'MessagePage',
+          messages: [
+            {
+              ...node('reply'),
+              replyTo: {
+                __typename: 'MessagePreview',
+                id: 'original',
+                body: 'before',
+                createdAt: node('original').createdAt,
+                author,
+              },
+            },
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    updateCachedPreview(cache, { ...node('original'), body: 'after' });
+    const read = cache.readQuery<{ messages: { messages: Array<{ replyTo: { body: string } }> } }>({
+      query: MESSAGES,
+      variables: { channelId: 'c1' },
+    });
+    expect(read?.messages.messages[0].replyTo.body).toBe('after');
+  });
+
   it('removes a deleted message from its channel while preserving another cached timeline', () => {
     const cache = createCache();
     for (const channelId of ['c1', 'c2']) {

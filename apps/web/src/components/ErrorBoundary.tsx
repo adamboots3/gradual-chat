@@ -12,7 +12,7 @@ interface ErrorBoundaryState {
 
 /**
  * Last line of defence: one malformed message should never white-screen the
- * whole workspace. The boundary keeps the shell alive and offers a retry.
+ * whole page. The boundary replaces the failed view with a retry card.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };

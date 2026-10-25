@@ -85,11 +85,7 @@ export function LogoMark() {
   return (
     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0F3D2E] ring-1 ring-accent/30">
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-        <path
-          d="M7 16.5c0-5 3.5-9 10-9-.5 6.5-4 10-10 9Z"
-          fill="#7FD8BD"
-          fillOpacity="0.92"
-        />
+        <path d="M7 16.5c0-5 3.5-9 10-9-.5 6.5-4 10-10 9Z" fill="#7FD8BD" fillOpacity="0.92" />
         <path d="M6.5 17.5 13 11" stroke="#0C0E12" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
     </span>

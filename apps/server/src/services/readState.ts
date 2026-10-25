@@ -19,7 +19,7 @@ function toObjectId(value: Types.ObjectId | string): Types.ObjectId {
 
 /**
  * Make sure every member of a channel has a read-state document. Called when a
- * channel is created/seeded so the hot path (`sendMessage`) is a pure `$inc`.
+ * channel is created. Seed data creates these rows with its initial unread counts.
  */
 export async function ensureReadStates(
   channelId: Types.ObjectId | string,

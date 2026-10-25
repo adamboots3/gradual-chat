@@ -1,11 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  ChatIcon,
-  ContributorsIcon,
-  ForumIcon,
-  MatchesIcon,
-  UsersIcon,
-} from './icons';
+import { ChatIcon, ContributorsIcon, ForumIcon, MatchesIcon, UsersIcon } from './icons';
 
 interface NavItemProps {
   label: string;
@@ -15,7 +9,13 @@ interface NavItemProps {
   tone?: string;
 }
 
-function NavItem({ label, icon, badge, active, tone = 'bg-[#191820] text-content/80' }: NavItemProps) {
+function NavItem({
+  label,
+  icon,
+  badge,
+  active,
+  tone = 'bg-[#191820] text-content/80',
+}: NavItemProps) {
   return (
     <button
       type="button"
@@ -47,7 +47,10 @@ interface SideRailProps {
 
 export function SideRail({ unreadTotal }: SideRailProps) {
   return (
-    <nav className="flex w-[196px] shrink-0 flex-col justify-between px-4 py-5" aria-label="Primary">
+    <nav
+      className="flex w-[196px] shrink-0 flex-col justify-between px-4 py-5"
+      aria-label="Primary"
+    >
       <div className="space-y-7">
         <div className="space-y-1">
           <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted/80">
@@ -63,7 +66,11 @@ export function SideRail({ unreadTotal }: SideRailProps) {
             People
           </p>
           <NavItem label="Members" icon={<UsersIcon />} tone="bg-[#6366F1] text-white" />
-          <NavItem label="Contributors" icon={<ContributorsIcon />} tone="bg-[#A855F7] text-white" />
+          <NavItem
+            label="Contributors"
+            icon={<ContributorsIcon />}
+            tone="bg-[#A855F7] text-white"
+          />
         </div>
       </div>
 

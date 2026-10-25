@@ -57,12 +57,11 @@ describe('HTTP surface', () => {
   });
 
   it('serves GraphQL over POST', async () => {
-    const response =
-      await graphql(`
-        {
-          __typename
-        }
-      `);
+    const response = await graphql(`
+      {
+        __typename
+      }
+    `);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { data?: { __typename?: string } };
     expect(body.data?.__typename).toBe('Query');

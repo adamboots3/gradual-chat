@@ -30,6 +30,18 @@ describe('MessageBody', () => {
     expect(screen.getByRole('list').tagName).toBe('UL');
   });
 
+  it('does not highlight unknown handles when the server resolved no mentions', () => {
+    const { container } = render(<MessageBody body="hello @ghost" mentions={[]} />);
+    expect(container.querySelector('.font-semibold')).toBeNull();
+  });
+
+  it('does not highlight a handle inside an email address', () => {
+    const { container } = render(
+      <MessageBody body="mail team@devon.com" mentions={[{ username: 'devon' }]} />,
+    );
+    expect(container.querySelector('.font-semibold')).toBeNull();
+  });
+
   it('never injects raw markup', () => {
     render(<MessageBody body={'<img src=x onerror="alert(1)">'} />);
     expect(document.querySelector('img')).toBeNull();

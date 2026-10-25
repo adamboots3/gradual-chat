@@ -3,7 +3,8 @@ import type { User } from '../types';
 
 type Tone = 'light' | 'dark';
 
-const INLINE_PATTERN = /(\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`\n]+`|@[A-Za-z0-9_]{2,32})/g;
+const INLINE_PATTERN =
+  /(\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`\n]+`|(?<![A-Za-z0-9_@])@[A-Za-z0-9_]{2,32})/g;
 
 function renderInline(text: string, mentionSet: Set<string>, tone: Tone, keyPrefix: string) {
   const nodes: ReactNode[] = [];
@@ -34,7 +35,7 @@ function renderInline(text: string, mentionSet: Set<string>, tone: Tone, keyPref
       );
     } else if (token.startsWith('@')) {
       const handle = token.slice(1).toLowerCase();
-      if (mentionSet.size === 0 || mentionSet.has(handle)) {
+      if (mentionSet.has(handle)) {
         nodes.push(
           <span
             key={key}
@@ -79,9 +80,7 @@ export function MessageBody({ body, mentions = [], tone = 'dark' }: MessageBodyP
     if (!list) return;
     const current = list;
     const items = current.items.map((item, index) => (
-      <li key={`${key}-li-${index}`}>
-        {renderInline(item, mentionSet, tone, `${key}-${index}`)}
-      </li>
+      <li key={`${key}-li-${index}`}>{renderInline(item, mentionSet, tone, `${key}-${index}`)}</li>
     ));
     blocks.push(
       current.ordered ? (

@@ -22,7 +22,7 @@ export function extractMentionHandles(body: string): string[] {
   return [...handles];
 }
 
-/** Handles used by the UI to highlight mentions while rendering a message. */
+/** Splits mention syntax into text segments; the React renderer lives in the web app. */
 export function splitMentions(body: string): Array<{ type: 'text' | 'mention'; value: string }> {
   const parts: Array<{ type: 'text' | 'mention'; value: string }> = [];
   let lastIndex = 0;

@@ -75,6 +75,14 @@ export function messageToPreview(message: Message): CachedPreview {
   });
 }
 
+/** Refresh sidebar and quoted previews when their source message is edited. */
+export function updateCachedPreview(cache: ApolloCache<unknown>, message: Message): void {
+  cache.modify({
+    id: cache.identify({ __typename: 'MessagePreview', id: message.id }),
+    fields: { body: () => message.body },
+  });
+}
+
 export function patchChannel(channel: Channel, patch: Partial<Channel>): CachedChannel {
   // Merge first, then normalise: a patched `lastMessage` must win over the
   // channel's previous preview.

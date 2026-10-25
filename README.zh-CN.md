@@ -39,7 +39,7 @@ npm run dev
 
 后端默认尝试连接 `mongodb://127.0.0.1:27017/gradual_chat`。本地 MongoDB 不可用时，会启动临时 MongoDB 实例并打印提示；该实例的数据在服务停止后不保留。首次使用可能需要下载 MongoDB 二进制文件，因此需要网络访问。
 
-### 使用 Docker Compose
+### 使用 Docker Compose（持久化演示）
 
 需要安装 Docker 和 Compose 插件。
 
@@ -61,19 +61,27 @@ MONGODB_URI=mongodb://127.0.0.1:27017/gradual_chat
 npm run dev
 ```
 
-也可以连接远程 MongoDB。显式设置 `MONGODB_URI` 后，如果连接失败，服务会报错退出，不会切换到临时数据库。
+也可以连接远程 MongoDB。显式设置 `MONGODB_URI` 后，如果连接失败，服务会报错退出，不会切换到临时数据库。Docker Compose 内部使用 `mongodb://mongo:27017/gradual_chat`，不会向宿主机映射 MongoDB 端口。
 
-需要重置演示数据时运行以下命令。**该操作会清空当前连接数据库中的演示集合，请先确认连接目标。**
+### 重置演示数据
+
+临时数据库：停止并重新启动应用，即可重新初始化数据。
+
+已有持久化数据库：确认 `.env` 中的 `MONGODB_URI` 与应用一致后执行：
 
 ```bash
 npm run seed -- --force
 ```
 
+Docker Compose：执行 `docker compose exec app node apps/server/dist/seed/cli.js --force`。
+
+**强制重置会清空并重建演示集合，请先确认连接目标。** 重置后用户 ID 会变化，需要重新登录。单独运行 seed 命令不能重置另一个应用进程的临时数据库，因此在回退到临时实例时会报错并提示重启应用。
+
 ## 演示账号
 
 ![登录界面](docs/screenshots/00-login.png)
 
-所有种子账号的密码均为 **`password123`**。登录页提供快捷选择账号的入口。
+所有种子账号的密码均为 **`password123`**。种子包含 12 位用户；登录页列出 3 个常用账号，点击可预填表单，再按 Sign in 登录。
 
 | 姓名        | 邮箱                | 推荐用途                       |
 | ----------- | ------------------- | ------------------------------ |
@@ -96,7 +104,7 @@ npm run seed -- --force
 | 可选：未读数          | 频道未读消息徽标、已读状态                      | `apps/server/src/services/readState.ts`  |
 | 可选：引用回复        | 消息自引用、同频道校验、引用预览                | `apps/server/src/services/messages.ts`   |
 | 可选：@提及           | 解析、自动补全、高亮                            | `apps/server/src/services/mentions.ts`   |
-| 可选：前后端测试      | 103 个测试，后端 49 个、前端 54 个              | `apps/server/test`、`apps/web/test`      |
+| 可选：前后端测试      | 109 个测试，后端 50 个、前端 59 个              | `apps/server/test`、`apps/web/test`      |
 
 此外还提供消息分页、软删除、消息编辑 API、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。消息编辑目前通过 API 提供，前端未提供编辑入口。
 
@@ -229,12 +237,12 @@ query Channels($userId: ID!) {
 
 ## 实时事件
 
-| 方向            | 事件                           | 载荷                                             |
-| --------------- | ------------------------------ | ------------------------------------------------ |
-| 服务端 → 客户端 | `message:new`                  | `{ message }`                                    |
-| 服务端 → 客户端 | `message:updated`              | `{ message }`                                    |
-| 服务端 → 客户端 | `message:deleted`              | `{ messageId, channelId }`                       |
-| 服务端 → 客户端 | `channel:unread`               | `{ channelId, unreadCount }`                    |
+| 方向            | 事件              | 载荷                         |
+| --------------- | ----------------- | ---------------------------- |
+| 服务端 → 客户端 | `message:new`     | `{ message }`                |
+| 服务端 → 客户端 | `message:updated` | `{ message }`                |
+| 服务端 → 客户端 | `message:deleted` | `{ messageId, channelId }`   |
+| 服务端 → 客户端 | `channel:unread`  | `{ channelId, unreadCount }` |
 
 Socket.IO 连接时通过 `query.userId` 传入用户 ID，不执行鉴权。网关根据该 ID 加入 `user:<id>` 个人房间和用户所属的 `channel:<id>` 频道房间，分别用于未读计数推送和频道消息广播。
 
@@ -273,13 +281,13 @@ npm run lint
 npm run build
 ```
 
-当前共 **103 个测试：后端 49 个，前端 54 个**。
+当前共 **109 个测试：后端 50 个，前端 59 个**。
 
 后端测试使用独立的临时 MongoDB 实例，覆盖账号密码登录、用户查询、消息分页、引用校验、未读消息计数、提及解析、无鉴权的编辑删除及频道访问、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
 
 前端使用 Vitest 和 Testing Library，覆盖登录、消息渲染、频道徽标、输入框、引用回复、格式化、错误边界和 Apollo 缓存。回归测试包括中文输入法防误发送、发送失败保留草稿并重试、可见提及候选的键盘导航和按所属频道删除缓存消息。
 
-生成覆盖率报告：
+生成当前覆盖率报告（保存在 `apps/server/coverage` 和 `apps/web/coverage`，不在文档中固定百分比）：
 
 ```bash
 npm run test:coverage
@@ -293,24 +301,27 @@ npm run verify:realtime
 
 该脚本使用 Chrome 或 Edge 的两个独立会话，验证消息送达、未读徽标出现及打开频道后清零、刷新保留当前用户和退出后切换账号，并向当前开发数据库写入测试消息。
 
-GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docker Compose 启动与 API 检查。工作流定义见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。
+推送到 `main` 或创建、更新 Pull Request 时，GitHub Actions 自动执行依赖安装、格式检查、lint、类型检查、测试和构建；通过后再进行 Docker Compose 启动与 API 检查。工作流定义见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。CI 不负责自动部署，双浏览器测试与截图仍需本地运行。
 
 ## 环境配置
 
 环境变量均有开发默认值，示例见 [.env.example](.env.example)。
 
-| 变量             | 默认值                             | 说明                                     |
-| ---------------- | ---------------------------------- | ---------------------------------------- |
-| `PORT`           | `4000`                             | API 与构建后前端的服务端口               |
-| `MONGODB_URI`    | 本地 MongoDB，不可用时回退临时实例 | 显式设置后连接失败即退出                 |
-| `SEED_ON_START`  | `true`                             | 用户集合为空时初始化演示数据             |
-| `LOG_LEVEL`      | `info`                             | pino 日志等级                            |
-| `WEB_ORIGIN`     | `http://localhost:5173`            | 前后端不同源时的 Socket.IO CORS 来源配置 |
+| 变量            | 默认值                             | 说明                                     |
+| --------------- | ---------------------------------- | ---------------------------------------- |
+| `PORT`          | `4000`                             | API 与构建后前端的服务端口               |
+| `MONGODB_URI`   | 本地 MongoDB，不可用时回退临时实例 | 显式设置后连接失败即退出                 |
+| `SEED_ON_START` | `true`                             | 用户集合为空时初始化演示数据             |
+| `LOG_LEVEL`     | `info`                             | pino 日志等级                            |
+| `WEB_ORIGIN`    | `http://localhost:5173`            | 前后端不同源时的 Socket.IO CORS 来源配置 |
+
+开发工具还支持 `API_PROXY_TARGET`（Vite 的 API 代理目标，默认 `http://localhost:4000`）、`BASE_URL`（浏览器脚本访问地址，默认 `http://localhost:5173`）及 `CHROME_PATH`（Chrome/Edge 可执行文件路径）。
 
 ## 界面设计
 
 - 采用设计参考中的深色面板、薄荷绿色消息气泡及红色未读徽标。
 - Inter 可变字体随项目提供，避免依赖外部字体 CDN。
+  字体的版权声明和许可证见 [OFL.txt](apps/web/public/fonts/OFL.txt)。
 - 头像使用姓名缩写和用户配色，便于离线运行。
 - 在设计基础上增加发送按钮、键盘提示和日期分隔线；所有消息均提供引用和删除入口。
 - 支持粗体、斜体、删除线、行内代码和列表。消息以 React 元素渲染，不注入原始 HTML。
@@ -318,7 +329,10 @@ GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docke
 ## 取舍与后续改进
 
 - **单实例部署。** Socket.IO 房间保存在进程内，横向扩容需要共享适配器及在线状态存储。
-- **未实现附件上传。** 当前没有对象存储或文件上传流程。
-- **搜索范围有限。** 搜索用于前端已加载列表的过滤，未提供服务端全文检索。
+- **未实现附件上传。** 当前没有文件上传入口或对象存储。
+- **搜索范围有限。** 频道列表上方的唯一搜索框过滤频道名称和已加载的最新消息摘要，不检索历史消息；顶部搜索框和静态时区标签已移除。
+- **设计占位。** Forum、Matches、Members、Contributors、通知和帮助图标、成员数按钮保留设计外观，未接入额外页面或弹窗；当前实现的是 Chat 页面。
+- **功能范围。** 只维护未读消息数；@提及保留补全和高亮，不提供未读提及徽标；没有“对方正在输入”提示及对应事件。
+- **引用删除。** 软删除消息后，该消息从会话列表中移除；已有的引用预览仍保留正文。
 - **简化登录。** `localStorage` 只保存当前用户 ID，登录时校验密码，后续接口不做身份与权限校验。
 - **未读一致性。** 当前增量维护计数，高并发场景仍需完善事务、一致性处理和定期校准机制。

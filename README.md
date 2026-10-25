@@ -32,7 +32,8 @@ Everything in the brief is implemented — including all four optional items (un
 
 ## Quick start
 
-Two supported paths — both work from a fresh clone with **no configuration**.
+Two startup paths are provided. No `.env` file is needed for the default demo; initial dependency and MongoDB
+binary downloads require network access.
 
 ### Option A — npm (fastest)
 
@@ -44,9 +45,9 @@ npm run dev
 ```
 
 Open <http://localhost:5173>. The demo workspace is seeded automatically; if no MongoDB is running locally the
-server boots an in-memory MongoDB and prints a warning (data is then lost on restart).
+server boots a temporary MongoDB process and prints a warning (data is then lost on restart).
 
-### Option B — Docker (closest to production)
+### Option B — Docker (persistent demo)
 
 Requires Docker with the compose plugin.
 
@@ -59,12 +60,24 @@ both the API and the built front end on a single port.
 
 ### Running against a real MongoDB
 
-```bash
-docker compose up -d mongo                       # or any MongoDB 6/7 instance
-MONGODB_URI=mongodb://127.0.0.1:27017/gradual_chat npm run dev
+Copy `.env.example` to `.env` at the repository root and set your existing MongoDB connection string:
+
+```dotenv
+MONGODB_URI=mongodb://127.0.0.1:27017/gradual_chat
 ```
 
-`npm run seed -- --force` resets the demo data at any time.
+Then run `npm run dev`. Docker Compose uses `mongodb://mongo:27017/gradual_chat` inside its network and does
+not publish MongoDB on the host.
+
+### Resetting demo data
+
+- Temporary MongoDB: stop and restart the app; it creates fresh demo data automatically.
+- Existing persistent MongoDB: use `npm run seed -- --force` with the same `MONGODB_URI` as the app.
+- Docker Compose: use `docker compose exec app node apps/server/dist/seed/cli.js --force`.
+
+The force command deletes and recreates the demo collections. Confirm the database first, then sign in again
+after resetting (the user IDs change). The standalone seed command rejects temporary databases because they
+cannot reset the database owned by another app process.
 
 ---
 
@@ -73,49 +86,49 @@ MONGODB_URI=mongodb://127.0.0.1:27017/gradual_chat npm run dev
 ![Sign in](docs/screenshots/00-login.png)
 
 Every seeded account uses the password **`password123`**. The sign-in screen lists them, so you can click one
-instead of typing.
+to prefill the form before pressing **Sign in**. The page lists three example accounts; the seed contains twelve users.
 
-| Person | Email | Best for |
-| --- | --- | --- |
-| Jenny White | `jenny@gradual.com` | The default account used in the design shots |
-| Devon Lane | `devon@gradual.com` | Second window — send each other messages to see realtime |
-| Jerry White | `jerry@gradual.com` | Author of the unread announcements |
+| Person      | Email               | Best for                                                 |
+| ----------- | ------------------- | -------------------------------------------------------- |
+| Jenny White | `jenny@gradual.com` | The default account used in the design shots             |
+| Devon Lane  | `devon@gradual.com` | Second window — send each other messages to see realtime |
+| Jerry White | `jerry@gradual.com` | Author of the unread announcements                       |
 
 > Tip: open two browser windows, sign in as Jenny in one and Devon in the other. Both are members of
-> *Share your story* and *Announcements*, so unread message badges and quote replies are visible
+> _Share your story_ and _Announcements_, so unread message badges and quote replies are visible
 > immediately.
 
 ---
 
 ## What is implemented
 
-| Assignment requirement | Status | Where to look |
-| --- | --- | --- |
-| Web UI following the design | ✅ Four designed states reproduced (default, hover actions, quote reply, @mention picker) | `apps/web/src/components`, screenshots below |
-| Realtime chat with socket.io | ✅ Per-channel rooms and per-user unread updates | `apps/server/src/realtime` |
-| MongoDB | ✅ Mongoose models, compound indexes, denormalised unread counters | `apps/server/src/models` |
-| Node.js (TypeScript) | ✅ Node 22, strict TypeScript, Express + Apollo | `apps/server` |
-| GraphQL | ✅ Schema-first API for every read and write | `apps/server/src/graphql/schema.graphql` |
-| React.js (TypeScript) | ✅ React 18 + Vite + Apollo Client + Tailwind | `apps/web` |
-| *(optional)* Unread count | ✅ Per-channel message badges and read cursors | `services/readState.ts` |
-| *(optional)* Quote reply model + API | ✅ Self-referencing `replyToId`, same-channel validation, quote UI | `services/messages.ts` |
-| *(optional)* Mention someone | ✅ Parsing, autocomplete and highlighting | `services/mentions.ts` |
-| *(optional)* Frontend and backend unit tests | ✅ 103 tests (49 backend, 54 frontend) | `apps/*/test` |
+| Assignment requirement                       | Status                                                                                    | Where to look                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Web UI following the design                  | ✅ Four designed states reproduced (default, hover actions, quote reply, @mention picker) | `apps/web/src/components`, screenshots below |
+| Realtime chat with socket.io                 | ✅ Per-channel rooms and per-user unread updates                                          | `apps/server/src/realtime`                   |
+| MongoDB                                      | ✅ Mongoose models, compound indexes, denormalised unread counters                        | `apps/server/src/models`                     |
+| Node.js (TypeScript)                         | ✅ Node 22, strict TypeScript, Express + Apollo                                           | `apps/server`                                |
+| GraphQL                                      | ✅ Schema-first API for every read and write                                              | `apps/server/src/graphql/schema.graphql`     |
+| React.js (TypeScript)                        | ✅ React 18 + Vite + Apollo Client + Tailwind                                             | `apps/web`                                   |
+| _(optional)_ Unread count                    | ✅ Per-channel message badges and read cursors                                            | `apps/server/src/services/readState.ts`      |
+| _(optional)_ Quote reply model + API         | ✅ Self-referencing `replyToId`, same-channel validation, quote UI                        | `apps/server/src/services/messages.ts`       |
+| _(optional)_ Mention someone                 | ✅ Parsing, autocomplete and highlighting                                                 | `apps/server/src/services/mentions.ts`       |
+| _(optional)_ Frontend and backend unit tests | ✅ 109 tests (50 backend, 59 frontend)                                                    | `apps/*/test`                                |
 
 A few things the brief did not ask for but that make the app feel finished: message pagination, soft deletes,
-edit support in the API, a message search filter, a `/healthz` endpoint, and a Docker image that serves the API
+edit support in the API (no edit UI), a conversation-list filter, a `/healthz` endpoint, and a Docker image that serves the API
 and the SPA from one origin (so there is no CORS setup at all).
 
 ---
 
 ## Screenshots
 
-| Default conversation | Hover actions |
-| --- | --- |
+| Default conversation                                  | Hover actions                                           |
+| ----------------------------------------------------- | ------------------------------------------------------- |
 | ![Conversation](docs/screenshots/01-conversation.png) | ![Hover actions](docs/screenshots/02-hover-actions.png) |
 
-| Quote reply | @mention autocomplete |
-| --- | --- |
+| Quote reply                                         | @mention autocomplete                         |
+| --------------------------------------------------- | --------------------------------------------- |
 | ![Quote reply](docs/screenshots/03-quote-reply.png) | ![Mentions](docs/screenshots/04-mentions.png) |
 
 The screenshots are generated from the running app:
@@ -170,7 +183,7 @@ the API and socket connection use the same origin.
    the message mentions them.
 4. The author's own read cursor moves to the new message.
 5. The socket gateway emits `message:new` to the channel room and per-user `channel:unread` to each member's
-   personal room (a user belongs to many channels; broadcasting badges to the channel room would leak counts).
+   personal room so each client receives that user's own counts.
 6. The client patches the Apollo cache instead of refetching, so the list, the sidebar preview and the badge all
    update without a network round trip.
 
@@ -187,14 +200,14 @@ ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount }
 
 Indexes:
 
-| Collection | Index | Purpose |
-| --- | --- | --- |
-| `Message` | `{ channelId: 1, _id: -1 }` | Cursor pagination (`_id` ordering is stable and monotonic) |
-| `Message` | `{ channelId: 1, createdAt: -1 }` | Time-based queries if ever needed |
-| `ReadState` | `{ channelId: 1, userId: 1 }` unique | One cursor per member per channel |
-| `ReadState` | `{ userId: 1 }` | Sidebar fetch for one user |
-| `Channel` | `{ memberIds: 1 }` | "Channels I belong to" |
-| `User` | `username`, `email` unique | Login and `@handle` resolution |
+| Collection  | Index                                | Purpose                                                    |
+| ----------- | ------------------------------------ | ---------------------------------------------------------- |
+| `Message`   | `{ channelId: 1, _id: -1 }`          | Cursor pagination (`_id` ordering is stable and monotonic) |
+| `Message`   | `{ channelId: 1, createdAt: -1 }`    | Time-based queries if ever needed                          |
+| `ReadState` | `{ channelId: 1, userId: 1 }` unique | One cursor per member per channel                          |
+| `ReadState` | `{ userId: 1 }`                      | Sidebar fetch for one user                                 |
+| `Channel`   | `{ memberIds: 1 }`                   | "Channels I belong to"                                     |
+| `User`      | `username`, `email` unique           | Login and `@handle` resolution                             |
 
 **Unread counts are denormalised on purpose.** The alternative — counting messages newer than `lastReadAt` on
 every sidebar render — costs one aggregation per channel. Instead `ReadState.unreadCount` is incremented inside the
@@ -214,8 +227,8 @@ When the server is running, the Apollo landing page is available at <http://loca
 ```graphql
 type Query {
   user(id: ID!): User
-  users(query: String!): [User!]!          # @mention typeahead
-  channels(userId: ID!): [Channel!]!        # includes unreadCount + lastMessage
+  users(query: String!): [User!]! # @mention typeahead
+  channels(userId: ID!): [Channel!]! # includes unreadCount + lastMessage
   messages(channelId: ID!, cursor: String, limit: Int): MessagePage!
 }
 
@@ -250,12 +263,12 @@ Errors use `extensions.code` (`BAD_USER_INPUT` or `NOT_FOUND`) for invalid input
 
 ## Realtime protocol
 
-| Direction | Event | Payload |
-| --- | --- | --- |
-| server → client | `message:new` | `{ message }` |
-| server → client | `message:updated` | `{ message }` |
-| server → client | `message:deleted` | `{ messageId, channelId }` |
-| server → client | `channel:unread` | `{ channelId, unreadCount }` |
+| Direction       | Event             | Payload                      |
+| --------------- | ----------------- | ---------------------------- |
+| server → client | `message:new`     | `{ message }`                |
+| server → client | `message:updated` | `{ message }`                |
+| server → client | `message:deleted` | `{ messageId, channelId }`   |
+| server → client | `channel:unread`  | `{ channelId, unreadCount }` |
 
 The client supplies `query.userId` when connecting. The gateway uses this ID to join `user:<id>` and the user's
 `channel:<id>` rooms for event routing. Connections do not perform authentication.
@@ -298,11 +311,10 @@ npm test                 # both workspaces
 npm run test:coverage    # with coverage
 ```
 
-Current coverage: **83.6%** of backend statements/lines and **61.8%** of frontend lines
-(**83.5%** of branches) — the frontend number is dominated by layout-only components that have no
-behaviour of their own.
+Run `npm run test:coverage` to generate current coverage results after code changes. Reports are written to
+`apps/server/coverage` and `apps/web/coverage`; static percentages are intentionally omitted to avoid stale numbers.
 
-**Backend (49 tests).** Database-backed test files each boot their own in-memory MongoDB, so nothing touches a real database.
+**Backend (50 tests).** Database-backed test files each boot their own temporary MongoDB, so nothing touches the app's database.
 
 - `mentions.test.ts` — parser edge cases: emails must not become mentions, handles stop at punctuation, case
   insensitivity, de-duplication.
@@ -319,7 +331,7 @@ behaviour of their own.
 - `resolvers.test.ts` — GraphQL layer through `executeOperation`: password login, user lookup, unread in the
   channel list, `markChannelRead`, mentions, reading/sending/editing/deleting without request authentication.
 
-**Frontend (54 tests)** with Testing Library:
+**Frontend (59 tests)** with Testing Library:
 
 - `MessageBody` — bold/italic/strike/code, mention highlighting, lists, and a regression test proving raw HTML is
   never injected.
@@ -328,9 +340,8 @@ behaviour of their own.
 - `Composer` — Enter sends, Shift+Enter keeps a newline, quote bar wiring, cancel reply, bold wrapping,
   IME input, failed-send retries and mention keyboard navigation.
 - `LoginPage` — demo accounts prefill, account switching, user hand-off, error state.
-- `cache` / `messagesCache` — regression cover for the two cache bugs found while building: socket payloads
-  written without `__typename` (which blanked `lastMessage.author`) and cursor pagination replacing instead of
-  prepending.
+- `cache` / `messagesCache` — socket payload normalisation, cursor pagination, deleting from the correct
+  channel cache, and refreshing quoted previews when their source message is edited.
 - `ErrorBoundary` — a render error degrades to a recoverable card instead of a white screen.
 - `format` — helpers degrade gracefully on missing data.
 
@@ -339,19 +350,27 @@ Devon), sends a message and asserts delivery, the unread badge appearing while t
 the badge clearing when the channel is opened, the selected user surviving a refresh, and signing out and back
 in as another account.
 
+**CI.** Pushing to `main` or opening/updating a pull request runs GitHub Actions: dependency installation,
+formatting, lint, type checking, tests, and build. A second job builds Docker Compose, checks `/healthz`, and
+queries GraphQL. This validates the app; it does not deploy a live demo. Browser smoke tests and screenshot
+capture remain local commands.
+
 ---
 
 ## Configuration
 
 All values have working defaults — `.env` is optional (see `.env.example`).
 
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `PORT` | `4000` | API port (also serves the built SPA) |
-| `MONGODB_URI` | local MongoDB, else in-memory | When set, the server fails loudly if it cannot connect |
-| `SEED_ON_START` | `true` | Seeds only when the users collection is empty |
-| `LOG_LEVEL` | `info` | pino |
-| `WEB_ORIGIN` | `http://localhost:5173` | socket.io CORS allow-list for a split-origin setup |
+| Variable        | Default                       | Notes                                                  |
+| --------------- | ----------------------------- | ------------------------------------------------------ |
+| `PORT`          | `4000`                        | API port (also serves the built SPA)                   |
+| `MONGODB_URI`   | local MongoDB, else in-memory | When set, the server fails loudly if it cannot connect |
+| `SEED_ON_START` | `true`                        | Seeds only when the users collection is empty          |
+| `LOG_LEVEL`     | `info`                        | pino                                                   |
+| `WEB_ORIGIN`    | `http://localhost:5173`       | socket.io CORS allow-list for a split-origin setup     |
+
+Development tools also accept `API_PROXY_TARGET` (Vite API proxy target, default `http://localhost:4000`),
+`BASE_URL` (browser-script target, default `http://localhost:5173`) and `CHROME_PATH` (Chrome/Edge executable).
 
 ---
 
@@ -361,6 +380,7 @@ All values have working defaults — `.env` is optional (see `.env.example`).
   `#7FD8BD`, badge `#E5484D`, muted text `#8E8C99`.
 - **Typography** is Inter (variable font bundled in `apps/web/public/fonts`, OFL licensed), so the layout does not
   depend on a CDN.
+  The font's copyright notice and license are included in [OFL.txt](apps/web/public/fonts/OFL.txt).
 - **Avatars** are generated from initials and a per-user colour instead of shipping third-party photos; this keeps
   the repository free of licensed assets and works offline.
 - **Deviations from the design, on purpose:** the composer has an explicit Send button and a keyboard hint; message
@@ -374,9 +394,15 @@ All values have working defaults — `.env` is optional (see `.env.example`).
 
 - **Single replica only.** Socket rooms live in process memory. Horizontal scaling would need the
   `@socket.io/redis-adapter` and a shared presence store; that is deliberately out of scope here.
-- **No attachments.** The design shows an attachment icon; file upload storage is a separate concern (S3 + signed
-  URLs) and was skipped.
-- **Full-text search is not implemented** — the two search inputs filter the loaded list client-side.
+- **No attachments.** Upload and file storage are out of scope; no attachment action is offered in the composer.
+- **Limited search.** The single search field above the conversation list filters channel names and latest-message
+  previews already loaded in the browser. It does not search message history. The top-bar search and static timezone
+  label were removed.
+- **Design placeholders.** Forum, Matches, Members, Contributors, notification/help icons and the member-count
+  button retain the design's appearance but do not open additional views. Chat is the implemented section.
+- **Simplified scope.** Only unread message counts are maintained. @mentions have autocomplete and highlighting,
+  with no separate unread mention badge. Typing-status events and indicators are not implemented.
+- **Quote deletion.** Soft-deleted messages disappear from the timeline; existing quote previews retain their text.
 - **Demo login.** Only the selected user ID is stored in `localStorage`; passwords are checked at login and
   never stored in the browser. This assignment version intentionally omits request authentication and access control.
 - **Unread reconciliation.** Counters are maintained incrementally; a background job recomputing them from

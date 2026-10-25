@@ -102,6 +102,16 @@ describe('sendMessage', () => {
 });
 
 describe('unread bookkeeping', () => {
+  it('rejects invalid message IDs and oversized edits with clear errors', async () => {
+    await expect(editMessage('invalid', 'hello')).rejects.toThrow('Message not found.');
+    await expect(deleteMessage('invalid')).rejects.toThrow('Message not found.');
+    const sent = await sendMessage(
+      { channelId: fx.channelId, body: 'original' },
+      String(fx.jenny._id),
+    );
+    await expect(editMessage(sent.message.id, 'x'.repeat(4001))).rejects.toThrow(/too long/i);
+    expect((await Message.findById(sent.message.id))?.body).toBe('original');
+  });
   it('updates mentions on edit without changing unread message counts', async () => {
     const sent = await sendMessage(
       { channelId: fx.channelId, body: 'hello @devon' },
