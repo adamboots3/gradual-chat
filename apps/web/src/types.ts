@@ -32,6 +32,5 @@ export interface Channel {
   memberCount: number;
   members: User[];
   unreadCount: number;
-  unreadMentionCount: number;
   lastMessage?: MessagePreview | null;
 }

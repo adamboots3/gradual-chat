@@ -6,7 +6,7 @@ import { verifyAuthToken } from '../auth/jwt';
 import { Channel } from '../models/Channel';
 import { User } from '../models/User';
 import { ReadState } from '../models/ReadState';
-import type { MessageEvent, RealtimeEmitter, TypingUser } from './emitter';
+import type { MessageEvent, RealtimeEmitter } from './emitter';
 
 interface SocketUser {
   id: string;
@@ -58,23 +58,6 @@ export async function createRealtime(httpServer: HttpServer): Promise<RealtimeSe
     const channels = await Channel.find({ memberIds: me.id }).select('_id').lean();
     for (const channel of channels) socket.join(`channel:${channel._id}`);
 
-    const isMemberOf = (channelId: string) => socket.rooms.has(`channel:${channelId}`);
-
-    socket.on('typing:start', (payload: { channelId?: string } | undefined) => {
-      if (!payload?.channelId || !isMemberOf(payload.channelId)) return;
-      const typingUser: TypingUser = me;
-      socket
-        .to(`channel:${payload.channelId}`)
-        .emit('typing:start', { channelId: payload.channelId, user: typingUser });
-    });
-
-    socket.on('typing:stop', (payload: { channelId?: string } | undefined) => {
-      if (!payload?.channelId || !isMemberOf(payload.channelId)) return;
-      socket
-        .to(`channel:${payload.channelId}`)
-        .emit('typing:stop', { channelId: payload.channelId, user: me });
-    });
-
     socket.on('disconnect', () => {
       logger.debug({ userId: me.id }, 'socket disconnected');
     });
@@ -86,7 +69,6 @@ export async function createRealtime(httpServer: HttpServer): Promise<RealtimeSe
       io.to(`user:${String(state.userId)}`).emit('channel:unread', {
         channelId,
         unreadCount: state.unreadCount ?? 0,
-        unreadMentionCount: state.unreadMentionCount ?? 0,
       });
     }
   }
@@ -98,7 +80,6 @@ export async function createRealtime(httpServer: HttpServer): Promise<RealtimeSe
     },
     async messageUpdated(result: MessageEvent) {
       io.to(`channel:${result.channelId}`).emit('message:updated', { message: result.message });
-      await broadcastBadges(result.channelId, result.memberIds);
     },
     async messageDeleted(result: MessageEvent) {
       io.to(`channel:${result.channelId}`).emit('message:deleted', {

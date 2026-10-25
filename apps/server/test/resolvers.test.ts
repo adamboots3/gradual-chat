@@ -54,7 +54,10 @@ describe('GraphQL auth', () => {
 
     expect(response.body.kind).toBe('single');
     if (response.body.kind === 'single') {
-      const payload = response.body.singleResult.data?.login as { token: string; user: { username: string } };
+      const payload = response.body.singleResult.data?.login as {
+        token: string;
+        user: { username: string };
+      };
       expect(payload.token).toBeTruthy();
       expect(payload.user.username).toBe('jenny');
     }
@@ -84,7 +87,7 @@ describe('GraphQL chat', () => {
 
     const response = await apollo.executeOperation(
       {
-        query: `{ channels { id unreadCount unreadMentionCount lastMessage { body } } }`,
+        query: `{ channels { id unreadCount lastMessage { body } } }`,
       },
       { contextValue: contextFor(fx.devon) },
     );
@@ -93,12 +96,10 @@ describe('GraphQL chat', () => {
       const channels = response.body.singleResult.data?.channels as Array<{
         id: string;
         unreadCount: number;
-        unreadMentionCount: number;
         lastMessage: { body: string };
       }>;
       const share = channels.find((channel) => channel.id === fx.channelId);
       expect(share?.unreadCount).toBe(1);
-      expect(share?.unreadMentionCount).toBe(1);
       expect(share?.lastMessage.body).toBe('hi @devon');
     }
   });
@@ -225,7 +226,10 @@ describe('GraphQL message maintenance', () => {
     }
 
     const timeline = await apollo.executeOperation(
-      { query: `query($id: ID!) { messages(channelId: $id) { messages { id } } }`, variables: { id: fx.channelId } },
+      {
+        query: `query($id: ID!) { messages(channelId: $id) { messages { id } } }`,
+        variables: { id: fx.channelId },
+      },
       { contextValue: contextFor(fx.jenny) },
     );
     if (timeline.body.kind === 'single') {

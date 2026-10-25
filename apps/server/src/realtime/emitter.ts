@@ -1,11 +1,5 @@
 import type { MessageDTO } from '../graphql/dto';
 
-export interface TypingUser {
-  id: string;
-  name: string;
-  username: string;
-}
-
 /** Everything the socket layer needs to fan a message write out. */
 export interface MessageEvent {
   channelId: string;

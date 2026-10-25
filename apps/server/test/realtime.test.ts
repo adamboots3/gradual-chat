@@ -74,7 +74,7 @@ async function waitForRoom(room: string, socketId: string, timeout = 4000): Prom
 }
 
 describe('socket.io gateway', () => {
-  it('pushes updated mention badges when a message is edited', async () => {
+  it('delivers edited message content and mentions to channel members', async () => {
     const sent = await sendMessage(
       { channelId: fx.channelId, body: 'hello' },
       String(fx.jenny._id),
@@ -82,15 +82,14 @@ describe('socket.io gateway', () => {
     const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
     await waitFor(devon, 'connect');
     await waitForRoom(`channel:${fx.channelId}`, String(devon.id));
-    const badgePromise = waitFor<{ unreadCount: number; unreadMentionCount: number }>(
-      devon,
-      'channel:unread',
-    );
-    const messagePromise = waitFor<{ message: { body: string } }>(devon, 'message:updated');
+    const messagePromise = waitFor<{
+      message: { body: string; mentions: Array<{ username: string }> };
+    }>(devon, 'message:updated');
     const edited = await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
     await realtime.emitter.messageUpdated(edited);
-    expect((await messagePromise).message.body).toBe('hello @devon');
-    expect(await badgePromise).toMatchObject({ unreadCount: 1, unreadMentionCount: 1 });
+    const payload = await messagePromise;
+    expect(payload.message.body).toBe('hello @devon');
+    expect(payload.message.mentions.map((user) => user.username)).toEqual(['devon']);
   });
 
   it('rejects a socket without a valid token', async () => {
@@ -127,7 +126,6 @@ describe('socket.io gateway', () => {
     const badgePromise = waitFor<{
       channelId: string;
       unreadCount: number;
-      unreadMentionCount: number;
     }>(devon, 'channel:unread');
 
     const result = await sendMessage(
@@ -137,42 +135,6 @@ describe('socket.io gateway', () => {
     await realtime.emitter.messageCreated(result);
 
     const badge = await badgePromise;
-    expect(badge.channelId).toBe(fx.channelId);
-    expect(badge.unreadCount).toBe(1);
-    expect(badge.unreadMentionCount).toBe(1);
-  });
-
-  it('broadcasts typing indicators to the channel but not back to the sender', async () => {
-    const jenny = connect(signAuthToken(String(fx.jenny._id), 'jenny'));
-    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
-    await Promise.all([waitFor(jenny, 'connect'), waitFor(devon, 'connect')]);
-    await Promise.all([
-      waitForRoom(`channel:${fx.channelId}`, String(jenny.id)),
-      waitForRoom(`channel:${fx.channelId}`, String(devon.id)),
-    ]);
-
-    const received = waitFor<{ channelId: string; user: { username: string } }>(
-      devon,
-      'typing:start',
-    );
-    jenny.emit('typing:start', { channelId: fx.channelId });
-
-    const payload = await received;
-    expect(payload.channelId).toBe(fx.channelId);
-    expect(payload.user.username).toBe('jenny');
-  });
-
-  it('ignores typing events for a channel the socket is not a member of', async () => {
-    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
-    await waitFor(devon, 'connect');
-
-    let received = false;
-    devon.on('typing:start', () => {
-      received = true;
-    });
-    devon.emit('typing:start', { channelId: fx.otherChannelId });
-
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(received).toBe(false);
+    expect(badge).toEqual({ channelId: fx.channelId, unreadCount: 1 });
   });
 });

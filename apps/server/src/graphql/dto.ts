@@ -34,7 +34,6 @@ export interface ChannelDTO {
   memberCount: number;
   members: UserDTO[];
   unreadCount: number;
-  unreadMentionCount: number;
   lastMessage: MessagePreviewDTO | null;
 }
 

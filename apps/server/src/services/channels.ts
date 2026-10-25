@@ -47,7 +47,6 @@ function buildChannelDTO(
     memberCount: members.length,
     members: members.map(toUserDTO),
     unreadCount: readState.unreadCount,
-    unreadMentionCount: readState.unreadMentionCount,
     lastMessage: lastMessage ? toPreviewDTO(lastMessage) : null,
   };
 }
@@ -79,10 +78,7 @@ export async function listChannelsForUser(userId: string): Promise<ChannelDTO[]>
   });
 }
 
-export async function getChannelForUser(
-  channelId: string,
-  userId: string,
-): Promise<ChannelDTO> {
+export async function getChannelForUser(channelId: string, userId: string): Promise<ChannelDTO> {
   if (!Types.ObjectId.isValid(channelId)) throw notFound('Channel not found.');
   const channel = await Channel.findOne({ _id: channelId, memberIds: userId }).populate(
     'memberIds',

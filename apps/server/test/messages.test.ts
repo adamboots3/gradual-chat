@@ -28,11 +28,6 @@ async function unreadFor(channelId: string, userId: string): Promise<number> {
   return state?.unreadCount ?? 0;
 }
 
-async function mentionCountFor(channelId: string, userId: string): Promise<number> {
-  const state = await ReadState.findOne({ channelId, userId }).lean();
-  return state?.unreadMentionCount ?? 0;
-}
-
 describe('sendMessage', () => {
   it('creates the message and bumps unread for everyone else', async () => {
     const result = await sendMessage(
@@ -47,16 +42,15 @@ describe('sendMessage', () => {
     expect(await unreadFor(fx.channelId, String(fx.jenny._id))).toBe(0);
   });
 
-  it('resolves @mentions and counts them separately', async () => {
+  it('resolves @mentions while counting the message once for every other member', async () => {
     const result = await sendMessage(
       { channelId: fx.channelId, body: 'ping @devon please review' },
       String(fx.jenny._id),
     );
 
     expect(result.message.mentions.map((user) => user.username)).toEqual(['devon']);
-    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(1);
-    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(0);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
+    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
   });
 
   it('does not create a mention for an unknown handle', async () => {
@@ -108,29 +102,29 @@ describe('sendMessage', () => {
 });
 
 describe('unread bookkeeping', () => {
-  it('adjusts mention badges on edit without changing message unread counts', async () => {
+  it('updates mentions on edit without changing unread message counts', async () => {
     const sent = await sendMessage(
       { channelId: fx.channelId, body: 'hello @devon' },
       String(fx.jenny._id),
     );
-    await editMessage(sent.message.id, 'hello @grace', String(fx.jenny._id));
-    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(0);
-    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(1);
+    const edited = await editMessage(sent.message.id, 'hello @grace', String(fx.jenny._id));
+    expect(edited.message.mentions.map((user) => user.username)).toEqual(['grace']);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
+    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
     await editMessage(sent.message.id, 'hello @grace again', String(fx.jenny._id));
-    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(1);
+    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
     await deleteMessage(sent.message.id, String(fx.jenny._id));
-    expect(await mentionCountFor(fx.channelId, String(fx.grace._id))).toBe(0);
+    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(0);
+    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
   });
 
-  it('does not add a mention badge when editing an already read message', async () => {
+  it('does not make an already read message unread when adding a mention', async () => {
     const sent = await sendMessage(
       { channelId: fx.channelId, body: 'hello' },
       String(fx.jenny._id),
     );
     await markChannelRead(fx.channelId, String(fx.devon._id));
     await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
-    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(0);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
   });
 
@@ -140,7 +134,6 @@ describe('unread bookkeeping', () => {
 
     await markChannelRead(fx.channelId, String(fx.devon._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
-    expect(await mentionCountFor(fx.channelId, String(fx.devon._id))).toBe(0);
   });
 
   it('decrements unread when an unread message is deleted', async () => {
@@ -162,7 +155,6 @@ describe('unread bookkeeping', () => {
     const share = channels.find((channel) => channel.id === fx.channelId);
 
     expect(share?.unreadCount).toBe(2);
-    expect(share?.unreadMentionCount).toBe(1);
     expect(share?.lastMessage?.body).toBe('two @devon');
   });
 });

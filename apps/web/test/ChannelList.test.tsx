@@ -18,7 +18,6 @@ const channels: Channel[] = [
     memberCount: 2,
     members,
     unreadCount: 3,
-    unreadMentionCount: 1,
     lastMessage: {
       id: 'm1',
       body: 'Weekly sync moved to Thursday',
@@ -34,17 +33,15 @@ const channels: Channel[] = [
     memberCount: 2,
     members,
     unreadCount: 0,
-    unreadMentionCount: 0,
     lastMessage: null,
   },
 ];
 
 describe('ChannelList', () => {
-  it('shows the unread badge and the @-mention marker', () => {
+  it('shows the unread message badge', () => {
     render(<ChannelList channels={channels} activeChannelId="c2" onSelect={vi.fn()} />);
 
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByTitle('1 unread mention(s)')).toBeInTheDocument();
   });
 
   it('hides the badge for a read channel', () => {

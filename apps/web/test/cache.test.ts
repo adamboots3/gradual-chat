@@ -32,7 +32,6 @@ const channel: Channel = {
   memberCount: 2,
   members: [author],
   unreadCount: 0,
-  unreadMentionCount: 0,
   lastMessage: null,
 };
 
@@ -62,7 +61,10 @@ describe('cache helpers', () => {
   });
 
   it('patches a channel while keeping its nested entities typed', () => {
-    const patched = patchChannel(channel, { unreadCount: 3, lastMessage: messageToPreview(message) });
+    const patched = patchChannel(channel, {
+      unreadCount: 3,
+      lastMessage: messageToPreview(message),
+    });
 
     expect(patched.__typename).toBe('Channel');
     expect(patched.unreadCount).toBe(3);

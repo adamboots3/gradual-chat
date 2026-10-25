@@ -81,22 +81,22 @@ npm run seed -- --force
 | Devon Lane  | `devon@gradual.com` | 第二个浏览器会话，验证实时聊天 |
 | Jerry White | `jerry@gradual.com` | 查看公告相关演示数据           |
 
-使用两个独立浏览器或无痕窗口，分别登录 Jenny 和 Devon。在共同频道发送消息，可验证实时送达、输入状态和引用回复；让接收方切到其他频道，可观察未读徽标，再打开原频道验证清零。
+使用两个独立浏览器或无痕窗口，分别登录 Jenny 和 Devon。在共同频道发送消息，可验证实时送达和引用回复；让接收方切到其他频道，可观察未读消息徽标，再打开原频道验证清零。
 
 ## 功能清单
 
 | 题目要求              | 实现情况                                        | 主要代码位置                             |
 | --------------------- | ----------------------------------------------- | ---------------------------------------- |
 | 按设计实现 Web UI     | 已实现会话、悬停操作、引用回复、@候选列表等状态 | `apps/web/src/components`                |
-| 实时聊天              | Socket.IO、JWT 握手鉴权、频道房间、输入状态提示 | `apps/server/src/realtime`               |
+| 实时聊天              | Socket.IO、JWT 握手鉴权、频道房间               | `apps/server/src/realtime`               |
 | React.js + TypeScript | React 18、Vite、Apollo Client、Tailwind         | `apps/web`                               |
 | Node.js + TypeScript  | Express、Apollo Server、严格类型检查            | `apps/server`                            |
 | MongoDB               | Mongoose 模型、复合索引、未读计数               | `apps/server/src/models`                 |
 | GraphQL               | 使用 SDL 定义查询与变更接口                     | `apps/server/src/graphql/schema.graphql` |
-| 可选：未读数          | 频道未读徽标、提及徽标、已读状态                | `apps/server/src/services/readState.ts`  |
+| 可选：未读数          | 频道未读消息徽标、已读状态                      | `apps/server/src/services/readState.ts`  |
 | 可选：引用回复        | 消息自引用、同频道校验、引用预览                | `apps/server/src/services/messages.ts`   |
-| 可选：@提及           | 解析、自动补全、高亮、提及计数                  | `apps/server/src/services/mentions.ts`   |
-| 可选：前后端测试      | 112 个测试，前后端各 56 个                      | `apps/server/test`、`apps/web/test`      |
+| 可选：@提及           | 解析、自动补全、高亮                            | `apps/server/src/services/mentions.ts`   |
+| 可选：前后端测试      | 108 个测试，前后端各 54 个                      | `apps/server/test`、`apps/web/test`      |
 
 此外还提供消息分页、软删除、消息编辑 API、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。消息编辑目前通过 API 提供，前端未提供编辑入口。
 
@@ -121,13 +121,23 @@ npm run screenshots
 ## 架构与数据流
 
 ```mermaid
-flowchart LR
-  UI["React + Apollo Client"] -- "GraphQL / HTTP" --> API["Apollo Server"]
-  UI -- "WebSocket" --> RT["Socket.IO 网关"]
-  API --> SVC["业务服务层"]
-  RT --> SVC
-  SVC -- "Mongoose" --> DB[("MongoDB")]
-  SVC -- "消息广播" --> RT
+sequenceDiagram
+  participant A as 发送者：React + Apollo Client
+  participant API as 后端：Apollo Server / 业务服务层
+  participant DB as MongoDB
+  participant RT as Socket.IO 网关
+  participant B as 接收者：React + Apollo Client
+  Note over A,B: 登录后建立 Socket.IO 连接，网关按频道成员身份加入房间
+  A->>API: ① GraphQL / HTTP：发送消息 mutation
+  API->>API: 校验身份、频道权限和消息内容
+  API->>DB: ② 通过 Mongoose 保存消息并更新未读数
+  DB-->>API: 写入成功
+  API->>RT: ③ 调用事件广播
+  RT-->>A: ④ 推送 message:new（频道房间，包含发送者）
+  RT-->>B: ④ 推送 message:new（频道房间）
+  RT-->>B: 推送 channel:unread（用户个人房间）
+  API-->>A: ⑤ GraphQL / HTTP：返回保存的消息
+  Note over A,B: 更新 Apollo 缓存，React 显示新消息；发送方按消息 ID 去重
 ```
 
 **GraphQL 负责读写，Socket.IO 负责实时通知。** 消息写入通过 mutation 完成，服务端保存后向频道成员广播。发送方也从 mutation 响应中获得消息，前端按消息 ID 去重。
@@ -138,7 +148,7 @@ flowchart LR
 
 1. 校验登录状态、频道成员权限、正文长度和引用目标所属频道。
 2. 解析正文中的 `@username`，查询对应用户。
-3. 保存消息，为其他频道成员增加未读数，为被提及的成员增加提及未读数。
+3. 保存消息，为其他频道成员增加一次未读消息数，是否被提及不影响计数。
 4. 更新发送者的已读状态。
 5. 向频道房间广播消息，向各用户的个人房间推送其未读计数。
 6. 前端更新 Apollo 缓存，同步消息列表、频道预览和徽标；Socket.IO 重连时重新查询以恢复状态。
@@ -149,7 +159,7 @@ flowchart LR
 User      { id, name, username, email, passwordHash, avatarColor, title }
 Channel   { id, name, slug, type: 'channel'|'dm', memberIds[], order }
 Message   { id, channelId, authorId, body, replyToId?, mentionIds[], editedAt?, deletedAt? }
-ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount, unreadMentionCount }
+ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount }
 ```
 
 | 集合        | 索引                                   | 用途                               |
@@ -161,7 +171,7 @@ ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount, unrea
 | `Channel`   | `{ memberIds: 1 }`                     | 查询用户加入的频道                 |
 | `User`      | `username`、`email` 唯一索引           | 登录和提及用户解析                 |
 
-未读数采用增量计数，减少侧栏查询时逐频道统计消息的开销。读取频道时清零；删除未读消息时相应减计数；编辑消息中的提及时调整尚未阅读该消息的成员的提及计数，并实时推送。
+未读消息数采用增量计数，减少侧栏查询时逐频道统计消息的开销。读取频道时清零，删除未读消息时相应减计数。@提及保留解析、自动补全和正文高亮，不单独维护未读计数或显示提及徽标；编辑提及不影响未读消息数。
 
 引用回复通过 `replyToId` 自引用实现。API 返回引用消息的精简预览，无需递归加载整个历史。
 
@@ -217,12 +227,10 @@ query {
 
 | 方向            | 事件                           | 载荷                                             |
 | --------------- | ------------------------------ | ------------------------------------------------ |
-| 客户端 → 服务端 | `typing:start` / `typing:stop` | `{ channelId }`                                  |
 | 服务端 → 客户端 | `message:new`                  | `{ message }`                                    |
 | 服务端 → 客户端 | `message:updated`              | `{ message }`                                    |
 | 服务端 → 客户端 | `message:deleted`              | `{ messageId, channelId }`                       |
-| 服务端 → 客户端 | `channel:unread`               | `{ channelId, unreadCount, unreadMentionCount }` |
-| 服务端 → 客户端 | `typing:start` / `typing:stop` | `{ channelId, user }`                            |
+| 服务端 → 客户端 | `channel:unread`               | `{ channelId, unreadCount }`                    |
 
 Socket.IO 在握手阶段检查 `socket.auth.token`，拒绝无效身份。连接后加入 `user:<id>` 个人房间和用户所属的 `channel:<id>` 频道房间，分别用于未读计数推送和频道消息广播。
 
@@ -262,9 +270,9 @@ npm run lint
 npm run build
 ```
 
-当前共 **112 个测试：后端 56 个，前端 56 个**。
+当前共 **108 个测试：后端 54 个，前端 54 个**。
 
-后端测试使用独立的临时 MongoDB 实例，覆盖身份校验、频道权限、消息分页、引用校验、未读与提及计数、编辑删除、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
+后端测试使用独立的临时 MongoDB 实例，覆盖身份校验、频道权限、消息分页、引用校验、未读消息计数、提及解析、编辑删除、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
 
 前端使用 Vitest 和 Testing Library，覆盖登录、消息渲染、频道徽标、输入框、引用回复、格式化、错误边界和 Apollo 缓存。回归测试包括中文输入法防误发送、发送失败保留草稿并重试、可见提及候选的键盘导航和按所属频道删除缓存消息。
 

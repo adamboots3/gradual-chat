@@ -43,7 +43,6 @@ export const CHANNEL_FIELDS = gql`
     type
     memberCount
     unreadCount
-    unreadMentionCount
     members {
       ...UserFields
     }
@@ -124,7 +123,6 @@ export const MARK_CHANNEL_READ = gql`
     markChannelRead(channelId: $channelId, lastMessageId: $lastMessageId) {
       id
       unreadCount
-      unreadMentionCount
     }
   }
 `;

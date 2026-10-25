@@ -36,7 +36,7 @@ describe('read state helpers', () => {
   it('moves the author cursor to their own message and clears the badge', async () => {
     await ReadState.updateOne(
       { channelId: fx.channelId, userId: fx.jenny._id },
-      { $set: { unreadCount: 4, unreadMentionCount: 2 } },
+      { $set: { unreadCount: 4 } },
     );
 
     const messageId = fx.jenny._id; // any ObjectId is fine for the cursor field
@@ -44,7 +44,6 @@ describe('read state helpers', () => {
 
     const state = await ReadState.findOne({ channelId: fx.channelId, userId: fx.jenny._id }).lean();
     expect(state?.unreadCount).toBe(0);
-    expect(state?.unreadMentionCount).toBe(0);
     expect(String(state?.lastReadMessageId)).toBe(String(messageId));
   });
 });

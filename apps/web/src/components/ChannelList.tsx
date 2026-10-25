@@ -93,14 +93,6 @@ export function ChannelList({ channels, activeChannelId, onSelect, loading }: Ch
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5">
-                  {channel.unreadMentionCount > 0 ? (
-                    <span
-                      className="flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-badge/90 px-[3px] text-[9px] font-bold leading-none text-white"
-                      title={`${channel.unreadMentionCount} unread mention(s)`}
-                    >
-                      @
-                    </span>
-                  ) : null}
                   <span
                     className={`truncate text-[12.5px] ${unread ? 'text-content/70' : 'text-muted'}`}
                   >

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
-import type { Socket } from 'socket.io-client';
 import {
   CHANNELS,
   DELETE_MESSAGE,
@@ -49,12 +48,9 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [typing, setTyping] = useState<Record<string, { name: string; at: number }>>({});
 
   const activeIdRef = useRef<string | null>(null);
   activeIdRef.current = activeId;
-  const socketRef = useRef<Socket | null>(null);
-  const lastTypingAt = useRef(0);
 
   useEffect(() => {
     if (channels.length === 0) return;
@@ -73,7 +69,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
     if (!activeId) return;
     const channel = channels.find((item) => item.id === activeId);
     if (!channel) return;
-    if (channel.unreadCount === 0 && channel.unreadMentionCount === 0) return;
+    if (channel.unreadCount === 0) return;
     void markRead({
       variables: { channelId: activeId, lastMessageId: channel.lastMessage?.id ?? null },
     });
@@ -115,14 +111,12 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   );
 
   const updateChannelBadge = useCallback(
-    (channelId: string, unreadCount: number, unreadMentionCount: number) => {
+    (channelId: string, unreadCount: number) => {
       client.cache.updateQuery<{ channels: Channel[] }>({ query: CHANNELS }, (data) => {
         if (!data) return data;
         return {
           channels: data.channels.map((channel) =>
-            channel.id === channelId
-              ? patchChannel(channel, { unreadCount, unreadMentionCount })
-              : channel,
+            channel.id === channelId ? patchChannel(channel, { unreadCount }) : channel,
           ),
         };
       });
@@ -169,46 +163,14 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
         void client.refetchQueries({ include: [CHANNELS] });
       },
       onUnread(payload) {
-        updateChannelBadge(payload.channelId, payload.unreadCount, payload.unreadMentionCount);
-      },
-      onTyping(payload) {
-        if (payload.user.id === me.id) return;
-        setTyping((current) => ({
-          ...current,
-          [payload.channelId]: { name: payload.user.name, at: Date.now() },
-        }));
-      },
-      onTypingStop(payload) {
-        setTyping((current) => {
-          if (!current[payload.channelId]) return current;
-          const next = { ...current };
-          delete next[payload.channelId];
-          return next;
-        });
+        updateChannelBadge(payload.channelId, payload.unreadCount);
       },
     });
 
-    socketRef.current = realtime.socket;
     return () => {
-      socketRef.current = null;
       realtime.disconnect();
     };
   }, [token, me, appendMessage, removeMessage, updateChannelBadge, markRead, client]);
-
-  // Expire stale "is typing…" labels.
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const now = Date.now();
-      setTyping((current) => {
-        const stale = Object.entries(current).filter(([, value]) => now - value.at > 3000);
-        if (stale.length === 0) return current;
-        const next = { ...current };
-        for (const [channelId] of stale) delete next[channelId];
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const activeChannel = channels.find((channel) => channel.id === activeId) ?? null;
   const unreadTotal = channels.reduce((total, channel) => total + channel.unreadCount, 0);
@@ -228,21 +190,6 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
     await deleteMessage({ variables: { id: message.id } });
     removeMessage(message.id, message.channelId);
     void client.refetchQueries({ include: [CHANNELS] });
-  };
-
-  const handleTyping = () => {
-    const now = Date.now();
-    if (now - lastTypingAt.current < 1500) return;
-    lastTypingAt.current = now;
-    if (activeIdRef.current) {
-      socketRef.current?.emit('typing:start', { channelId: activeIdRef.current });
-    }
-  };
-
-  const handleStopTyping = () => {
-    if (activeIdRef.current) {
-      socketRef.current?.emit('typing:stop', { channelId: activeIdRef.current });
-    }
   };
 
   if (meLoading) {
@@ -285,12 +232,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
         <main className="flex min-w-0 flex-1 flex-col bg-panel">
           {activeChannel ? (
             <>
-              <ChatHeader
-                channel={activeChannel}
-                typingLabel={
-                  typing[activeChannel.id] ? `${typing[activeChannel.id].name} is typing…` : null
-                }
-              />
+              <ChatHeader channel={activeChannel} />
               <MessageList
                 channelId={activeChannel.id}
                 currentUserId={me.id}
@@ -302,8 +244,6 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
                 onSend={handleSend}
-                onTyping={handleTyping}
-                onStopTyping={handleStopTyping}
               />
             </>
           ) : (

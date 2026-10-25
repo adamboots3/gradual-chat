@@ -8,7 +8,9 @@ type User {
   title: String
 }
 
-"""A trimmed-down message used for quote replies and channel previews."""
+"""
+A trimmed-down message used for quote replies and channel previews.
+"""
 type MessagePreview {
   id: ID!
   body: String!
@@ -31,13 +33,16 @@ type Channel {
   id: ID!
   name: String!
   slug: String!
-  """`channel` for public rooms, `dm` for direct messages."""
+  """
+  `channel` for public rooms, `dm` for direct messages.
+  """
   type: String!
   memberCount: Int!
   members: [User!]!
-  """Denormalised unread badge, maintained on every write (see ReadState)."""
+  """
+  Denormalised unread badge, maintained on every write (see ReadState).
+  """
   unreadCount: Int!
-  unreadMentionCount: Int!
   lastMessage: MessagePreview
 }
 
@@ -59,7 +64,9 @@ input SendMessageInput {
 
 type Query {
   me: User
-  """Typeahead source for the @mention picker."""
+  """
+  Typeahead source for the @mention picker.
+  """
   users(query: String!): [User!]!
   channels: [Channel!]!
   messages(channelId: ID!, cursor: String, limit: Int): MessagePage!

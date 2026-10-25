@@ -43,20 +43,10 @@ interface ComposerProps {
   replyTo: Message | null;
   onCancelReply: () => void;
   onSend: (body: string, replyToId: string | null) => Promise<void> | void;
-  onTyping: () => void;
-  onStopTyping: () => void;
   disabled?: boolean;
 }
 
-export function Composer({
-  channelName,
-  replyTo,
-  onCancelReply,
-  onSend,
-  onTyping,
-  onStopTyping,
-  disabled,
-}: ComposerProps) {
+export function Composer({ channelName, replyTo, onCancelReply, onSend, disabled }: ComposerProps) {
   const [text, setText] = useState('');
   const [mention, setMention] = useState<MentionState | null>(null);
   const [highlight, setHighlight] = useState(0);
@@ -89,7 +79,6 @@ export function Composer({
   const handleChange = (value: string, caret: number) => {
     setText(value);
     updateMentionState(value, caret);
-    onTyping();
     const element = textareaRef.current;
     if (element) {
       element.style.height = 'auto';
@@ -153,7 +142,6 @@ export function Composer({
       await onSend(body, replyTo?.id ?? null);
       setText('');
       setMention(null);
-      onStopTyping();
       const element = textareaRef.current;
       if (element) element.style.height = 'auto';
     } catch (error) {
@@ -298,7 +286,6 @@ export function Composer({
           composingRef.current = false;
         }}
         onClick={(event) => updateMentionState(text, event.currentTarget.selectionStart)}
-        onBlur={onStopTyping}
         placeholder={`Message ${channelName}`}
         aria-label={`Message ${channelName}`}
         className="max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-content placeholder:text-muted focus:outline-none disabled:opacity-60"

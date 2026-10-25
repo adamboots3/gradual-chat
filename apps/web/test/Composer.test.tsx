@@ -27,8 +27,6 @@ function renderComposer(overrides: Partial<React.ComponentProps<typeof Composer>
     replyTo: null,
     onCancelReply: vi.fn(),
     onSend: vi.fn().mockResolvedValue(undefined),
-    onTyping: vi.fn(),
-    onStopTyping: vi.fn(),
     ...overrides,
   };
 
@@ -96,8 +94,6 @@ describe('Composer', () => {
           replyTo={null}
           onCancelReply={vi.fn()}
           onSend={onSend}
-          onTyping={vi.fn()}
-          onStopTyping={vi.fn()}
         />
       </MockedProvider>,
     );
@@ -163,11 +159,5 @@ describe('Composer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Bold' }));
 
     expect(input).toHaveValue('make me **bold**');
-  });
-
-  it('reports typing activity', async () => {
-    const props = renderComposer();
-    await userEvent.type(screen.getByLabelText('Message Share your story'), 'hey');
-    expect(props.onTyping).toHaveBeenCalled();
   });
 });

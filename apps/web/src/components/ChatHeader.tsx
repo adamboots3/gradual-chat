@@ -3,19 +3,13 @@ import { UsersIcon } from './icons';
 
 interface ChatHeaderProps {
   channel: Channel;
-  typingLabel: string | null;
 }
 
-export function ChatHeader({ channel, typingLabel }: ChatHeaderProps) {
+export function ChatHeader({ channel }: ChatHeaderProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-black/30 px-6">
       <div className="flex min-w-0 items-baseline gap-3">
         <h1 className="truncate text-[16px] font-semibold tracking-tight">{channel.name}</h1>
-        {typingLabel ? (
-          <span className="truncate text-[12px] text-accent/80" aria-live="polite">
-            {typingLabel}
-          </span>
-        ) : null}
       </div>
 
       <button

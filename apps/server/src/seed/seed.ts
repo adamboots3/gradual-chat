@@ -52,7 +52,10 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
   const users = await User.insertMany(seedUsers.map((user) => ({ ...user, passwordHash })));
   const usersByName = new Map(users.map((user) => [user.username, user]));
 
-  const channels: Array<{ channel: InstanceType<typeof Channel>; spec: (typeof seedChannels)[number] }> = [];
+  const channels: Array<{
+    channel: InstanceType<typeof Channel>;
+    spec: (typeof seedChannels)[number];
+  }> = [];
   for (const spec of seedChannels) {
     const channel = await Channel.create({
       name: spec.name,
@@ -66,7 +69,7 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
   const now = Date.now();
   const messagesByChannel = new Map<
     string,
-    Array<{ _id: Types.ObjectId; createdAt: Date; authorId: Types.ObjectId; mentionIds: Types.ObjectId[] }>
+    Array<{ _id: Types.ObjectId; createdAt: Date; authorId: Types.ObjectId }>
   >();
 
   for (const { channel, spec } of channels) {
@@ -107,7 +110,6 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
         _id: message._id,
         createdAt: message.createdAt,
         authorId: message.authorId,
-        mentionIds: message.mentionIds,
       })),
     );
   }
@@ -120,16 +122,12 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
 
     for (const memberId of channel.memberIds) {
       let unreadCount = 0;
-      let unreadMentionCount = 0;
       let lastReadMessageId: Types.ObjectId | null = null;
 
       for (const message of messages) {
         if (String(message.authorId) === String(memberId)) continue;
         if (message.createdAt > lastReadAt) {
           unreadCount += 1;
-          if (message.mentionIds.some((id) => String(id) === String(memberId))) {
-            unreadMentionCount += 1;
-          }
         } else {
           lastReadMessageId = message._id;
         }
@@ -141,7 +139,6 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
         lastReadAt,
         lastReadMessageId,
         unreadCount,
-        unreadMentionCount,
       });
     }
   }
@@ -151,7 +148,12 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
       `Sign in with any demo account (password: ${DEMO_PASSWORD}).`,
   );
 
-  return { skipped: false, users: users.length, channels: channels.length, messages: totalMessages };
+  return {
+    skipped: false,
+    users: users.length,
+    channels: channels.length,
+    messages: totalMessages,
+  };
 }
 
 export async function resetDatabase(): Promise<void> {

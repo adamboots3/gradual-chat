@@ -1,15 +1,9 @@
 import { io, type Socket } from 'socket.io-client';
 import type { Message } from '../types';
 
-export interface TypingPayload {
-  channelId: string;
-  user: { id: string; name: string; username: string };
-}
-
 export interface UnreadPayload {
   channelId: string;
   unreadCount: number;
-  unreadMentionCount: number;
 }
 
 export interface RealtimeHandlers {
@@ -19,8 +13,6 @@ export interface RealtimeHandlers {
   onMessageUpdated(message: Message): void;
   onMessageDeleted(payload: { messageId: string; channelId: string }): void;
   onUnread(payload: UnreadPayload): void;
-  onTyping(payload: TypingPayload): void;
-  onTypingStop(payload: TypingPayload): void;
 }
 
 export interface RealtimeClient {
@@ -48,8 +40,6 @@ export function connectRealtime(token: string, handlers: RealtimeHandlers): Real
     handlers.onMessageDeleted(payload),
   );
   socket.on('channel:unread', (payload: UnreadPayload) => handlers.onUnread(payload));
-  socket.on('typing:start', (payload: TypingPayload) => handlers.onTyping(payload));
-  socket.on('typing:stop', (payload: TypingPayload) => handlers.onTypingStop(payload));
 
   return {
     socket,

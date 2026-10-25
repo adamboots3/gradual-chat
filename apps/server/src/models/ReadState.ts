@@ -18,7 +18,6 @@ const readStateSchema = new Schema(
     lastReadAt: { type: Date, default: () => new Date(0) },
     lastReadMessageId: { type: Schema.Types.ObjectId, ref: 'Message', default: null },
     unreadCount: { type: Number, default: 0, min: 0 },
-    unreadMentionCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );
