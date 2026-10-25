@@ -5,7 +5,7 @@ import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import type { Server as HttpServer } from 'http';
 import { resolvers } from './resolvers';
-import type { GraphQLContext } from '../auth/context';
+import type { GraphQLContext } from './context';
 
 function resolveSchemaPath(): string {
   const candidates = [

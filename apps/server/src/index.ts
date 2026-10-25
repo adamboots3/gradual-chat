@@ -1,6 +1,6 @@
 import { createServer } from 'http';
 import express from 'express';
-import { config, DEFAULT_JWT_SECRET } from './config';
+import { config } from './config';
 import { logger } from './logger';
 import { connectDatabase } from './db/connect';
 import { createRealtime } from './realtime';
@@ -9,10 +9,6 @@ import { mountHttpRoutes } from './app';
 import { seedDatabase } from './seed/seed';
 
 async function main(): Promise<void> {
-  if (config.jwtSecret === DEFAULT_JWT_SECRET && config.isProduction) {
-    logger.warn('JWT_SECRET is using the development default — set it before deploying.');
-  }
-
   const database = await connectDatabase();
 
   if (config.seedOnStart) {

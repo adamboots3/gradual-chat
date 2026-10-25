@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { hashPassword } from '../../src/auth/jwt';
+import { hashPassword } from '../../src/services/passwords';
 import { Channel } from '../../src/models/Channel';
 import { ReadState } from '../../src/models/ReadState';
 import { User, type UserDocument } from '../../src/models/User';
@@ -23,9 +23,27 @@ export async function createFixture(): Promise<Fixture> {
   const passwordHash = await hashPassword(TEST_PASSWORD);
 
   const [jenny, devon, grace] = await User.create([
-    { name: 'Jenny White', username: 'jenny', email: 'jenny@test.dev', passwordHash, avatarColor: '#7FD8BD' },
-    { name: 'Devon Lane', username: 'devon', email: 'devon@test.dev', passwordHash, avatarColor: '#F2B8A2' },
-    { name: 'Grace Lin', username: 'grace', email: 'grace@test.dev', passwordHash, avatarColor: '#A8E6D8' },
+    {
+      name: 'Jenny White',
+      username: 'jenny',
+      email: 'jenny@test.dev',
+      passwordHash,
+      avatarColor: '#7FD8BD',
+    },
+    {
+      name: 'Devon Lane',
+      username: 'devon',
+      email: 'devon@test.dev',
+      passwordHash,
+      avatarColor: '#F2B8A2',
+    },
+    {
+      name: 'Grace Lin',
+      username: 'grace',
+      email: 'grace@test.dev',
+      passwordHash,
+      avatarColor: '#A8E6D8',
+    },
   ]);
 
   const share = await Channel.create({

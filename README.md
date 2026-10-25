@@ -92,7 +92,7 @@ instead of typing.
 | Assignment requirement | Status | Where to look |
 | --- | --- | --- |
 | Web UI following the design | ✅ Four designed states reproduced (default, hover actions, quote reply, @mention picker) | `apps/web/src/components`, screenshots below |
-| Realtime chat with socket.io | ✅ JWT-authenticated sockets and per-channel rooms | `apps/server/src/realtime` |
+| Realtime chat with socket.io | ✅ Per-channel rooms and per-user unread updates | `apps/server/src/realtime` |
 | MongoDB | ✅ Mongoose models, compound indexes, denormalised unread counters | `apps/server/src/models` |
 | Node.js (TypeScript) | ✅ Node 22, strict TypeScript, Express + Apollo | `apps/server` |
 | GraphQL | ✅ Schema-first API for every read and write | `apps/server/src/graphql/schema.graphql` |
@@ -100,7 +100,7 @@ instead of typing.
 | *(optional)* Unread count | ✅ Per-channel message badges and read cursors | `services/readState.ts` |
 | *(optional)* Quote reply model + API | ✅ Self-referencing `replyToId`, same-channel validation, quote UI | `services/messages.ts` |
 | *(optional)* Mention someone | ✅ Parsing, autocomplete and highlighting | `services/mentions.ts` |
-| *(optional)* Frontend and backend unit tests | ✅ 108 tests (54 backend, 54 frontend) | `apps/*/test` |
+| *(optional)* Frontend and backend unit tests | ✅ 103 tests (49 backend, 54 frontend) | `apps/*/test` |
 
 A few things the brief did not ask for but that make the app feel finished: message pagination, soft deletes,
 edit support in the API, a message search filter, a `/healthz` endpoint, and a Docker image that serves the API
@@ -138,7 +138,7 @@ sequenceDiagram
   participant B as Recipient: React + Apollo Client
   Note over A,B: After login, clients connect to Socket.IO and join rooms based on channel membership
   A->>API: 1. GraphQL / HTTP: sendMessage mutation
-  API->>API: Validate identity, membership and message
+  API->>API: Validate message content and quote target
   API->>DB: 2. Save message and update unread counts via Mongoose
   DB-->>API: Write succeeded
   API->>RT: 3. Invoke event broadcast
@@ -149,22 +149,22 @@ sequenceDiagram
   Note over A,B: Update Apollo cache and render; sender deduplicates by message ID
 ```
 
-**Why GraphQL for writes and socket.io for pushes?** GraphQL is a great fit for queries and mutations, but
-subscriptions over `graphql-ws` add a second transport, a second auth path and per-operation authorisation logic.
+**Why GraphQL for writes and socket.io for pushes?** GraphQL handles queries and mutations, while
+socket.io provides channel rooms for realtime delivery without a separate GraphQL subscription transport.
 Chat messages are a broadcast problem: one write, N recipients. Rooms in socket.io model that directly, and the
 mutation response already gives the author an authoritative copy of the message. The result is one HTTP API, one
 WebSocket channel, and no duplicated data flow.
 
 **Same origin everywhere.** In development Vite proxies `/graphql` and `/socket.io` to the API. In production the
 Express server serves `apps/web/dist` alongside the API. There is no cross-origin request in either mode, so
-cookies, tokens and the socket handshake all behave identically.
+the API and socket connection use the same origin.
 
 **Read path.** `channels` returns the badge counts with every channel, so the sidebar renders from a single query.
 `messages` is cursor-paginated by `_id`, which is monotonic and covered by the compound index.
 
 **Write path (sending a message).**
 
-1. `sendMessage` mutation → membership check → body validation → quote-target validation in the same channel.
+1. `sendMessage` mutation with the selected user ID → body validation → quote-target validation in the same channel.
 2. `@handles` are parsed and resolved to user ids in one query.
 3. The message is inserted; unread message counters are incremented once for every other member, whether or not
    the message mentions them.
@@ -213,37 +213,38 @@ When the server is running, the Apollo landing page is available at <http://loca
 
 ```graphql
 type Query {
-  me: User
+  user(id: ID!): User
   users(query: String!): [User!]!          # @mention typeahead
-  channels: [Channel!]!                    # includes unreadCount + lastMessage
+  channels(userId: ID!): [Channel!]!        # includes unreadCount + lastMessage
   messages(channelId: ID!, cursor: String, limit: Int): MessagePage!
 }
 
 type Mutation {
-  login(email: String!, password: String!): AuthPayload!
-  sendMessage(input: SendMessageInput!): Message!
-  markChannelRead(channelId: ID!, lastMessageId: ID): Channel!
+  login(email: String!, password: String!): User!
+  sendMessage(input: SendMessageInput!, userId: ID!): Message!
+  markChannelRead(channelId: ID!, userId: ID!, lastMessageId: ID): Channel!
   editMessage(id: ID!, body: String!): Message!
   deleteMessage(id: ID!): Message!
 }
 ```
 
-Example request:
+Login returns user information after checking the password (stored as a bcrypt hash):
 
-```bash
-TOKEN=$(curl -s http://localhost:4000/graphql \
-  -H 'content-type: application/json' \
-  -d '{"query":"mutation { login(email: \"jenny@gradual.com\", password: \"password123\") { token } }"}' \
-  | node -pe 'JSON.parse(require("fs").readFileSync(0)).data.login.token')
-
-curl -s http://localhost:4000/graphql \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $TOKEN" \
-  -d '{"query":"{ channels { name unreadCount lastMessage { body } } }"}'
+```graphql
+mutation {
+  login(email: "jenny@gradual.com", password: "password123") {
+    id
+    name
+    username
+  }
+}
 ```
 
-Errors carry a stable `extensions.code` (`UNAUTHENTICATED`, `FORBIDDEN`, `BAD_USER_INPUT`, `NOT_FOUND`) so the
-client can distinguish "your session expired" from "you typed an empty message".
+Use the returned ID as `userId` in channel queries, message sends and read updates. Requests do not require an
+Authorization header. Login only checks the password; the demo has no JWT, server session, channel permission
+checks or message ownership checks. User IDs select demo data and do not prove identity.
+
+Errors use `extensions.code` (`BAD_USER_INPUT` or `NOT_FOUND`) for invalid input and missing data.
 
 ---
 
@@ -256,8 +257,8 @@ client can distinguish "your session expired" from "you typed an empty message".
 | server → client | `message:deleted` | `{ messageId, channelId }` |
 | server → client | `channel:unread` | `{ channelId, unreadCount }` |
 
-Authentication happens during the handshake (`socket.auth.token`); an invalid token is rejected before the
-connection is established. A socket joins `user:<id>` plus one `channel:<id>` room per membership.
+The client supplies `query.userId` when connecting. The gateway uses this ID to join `user:<id>` and the user's
+`channel:<id>` rooms for event routing. Connections do not perform authentication.
 
 ---
 
@@ -268,7 +269,6 @@ connection is established. A socket joins `user:<id>` plus one `channel:<id>` ro
 ├─ apps/
 │  ├─ server/                  Node 22 · TypeScript · Apollo · Mongoose · socket.io
 │  │  ├─ src/
-│  │  │  ├─ auth/              JWT signing, GraphQL context
 │  │  │  ├─ db/                Mongo connection with in-memory fallback
 │  │  │  ├─ graphql/           schema.graphql, resolvers, DTO mappers
 │  │  │  ├─ models/            User, Channel, Message, ReadState
@@ -302,33 +302,32 @@ Current coverage: **83.6%** of backend statements/lines and **61.8%** of fronten
 (**83.5%** of branches) — the frontend number is dominated by layout-only components that have no
 behaviour of their own.
 
-**Backend (54 tests).** Database-backed test files each boot their own in-memory MongoDB, so nothing touches a real database.
+**Backend (49 tests).** Database-backed test files each boot their own in-memory MongoDB, so nothing touches a real database.
 
 - `mentions.test.ts` — parser edge cases: emails must not become mentions, handles stop at punctuation, case
   insensitivity, de-duplication.
 - `cursor.test.ts` — cursor round-trip, malformed cursor rejection, page-size clamping.
-- `auth.test.ts` / `context.test.ts` — hashing, token signing, tampered tokens, bearer-header parsing
-  (including array headers and invalid tokens).
+- `passwords.test.ts` — password hashing and correct/incorrect password verification.
 - `messages.test.ts` — unread increments only for others, mention resolution, quote validation across channels,
-  empty body rejection, membership enforcement, delete decrements the badge, pagination walking backwards,
+  empty body rejection, unknown user handling, delete decrements the badge, pagination walking backwards,
   deleted messages disappearing from the timeline, sidebar badge aggregation.
 - `readState.test.ts` — read-state backfill is idempotent, author cursor moves on send.
-- `realtime.test.ts` — a real socket.io server and clients: unauthenticated sockets are rejected, messages reach
+- `realtime.test.ts` — a real socket.io server and clients: connections need no credentials, messages reach
   the other channel member, edited messages are delivered, and unread message badges are pushed to the recipient.
 - `http.test.ts` — the Express surface end to end: health check, GraphQL over POST, unauthenticated requests,
   malformed JSON returning 400 rather than crashing.
-- `resolvers.test.ts` — GraphQL layer through `executeOperation`: login failures, auth guards, unread in the
-  channel list, `markChannelRead`, mentions, edit/delete permissions.
+- `resolvers.test.ts` — GraphQL layer through `executeOperation`: password login, user lookup, unread in the
+  channel list, `markChannelRead`, mentions, reading/sending/editing/deleting without request authentication.
 
 **Frontend (54 tests)** with Testing Library:
 
 - `MessageBody` — bold/italic/strike/code, mention highlighting, lists, and a regression test proving raw HTML is
   never injected.
-- `MessageItem` / `ChatHeader` — quote previews, "edited" marker, author-only delete, channel name and member count.
+- `MessageItem` / `ChatHeader` — quote previews, "edited" marker, delete actions, channel name and member count.
 - `ChannelList` / `SideRail` / `TopBar` — unread message badges, active state, search filtering, account menu.
 - `Composer` — Enter sends, Shift+Enter keeps a newline, quote bar wiring, cancel reply, bold wrapping,
   IME input, failed-send retries and mention keyboard navigation.
-- `LoginPage` — demo accounts prefill, account switching, token hand-off, error state.
+- `LoginPage` — demo accounts prefill, account switching, user hand-off, error state.
 - `cache` / `messagesCache` — regression cover for the two cache bugs found while building: socket payloads
   written without `__typename` (which blanked `lastMessage.author`) and cursor pagination replacing instead of
   prepending.
@@ -337,7 +336,8 @@ behaviour of their own.
 
 **End-to-end (optional, local only).** `npm run verify:realtime` drives two headless browser sessions (Jenny and
 Devon), sends a message and asserts delivery, the unread badge appearing while the recipient is elsewhere, and
-the badge clearing when the channel is opened.
+the badge clearing when the channel is opened, the selected user surviving a refresh, and signing out and back
+in as another account.
 
 ---
 
@@ -349,8 +349,6 @@ All values have working defaults — `.env` is optional (see `.env.example`).
 | --- | --- | --- |
 | `PORT` | `4000` | API port (also serves the built SPA) |
 | `MONGODB_URI` | local MongoDB, else in-memory | When set, the server fails loudly if it cannot connect |
-| `JWT_SECRET` | dev value + warning | Must be overridden in production |
-| `JWT_EXPIRES_IN` | `7d` | |
 | `SEED_ON_START` | `true` | Seeds only when the users collection is empty |
 | `LOG_LEVEL` | `info` | pino |
 | `WEB_ORIGIN` | `http://localhost:5173` | socket.io CORS allow-list for a split-origin setup |
@@ -366,8 +364,7 @@ All values have working defaults — `.env` is optional (see `.env.example`).
 - **Avatars** are generated from initials and a per-user colour instead of shipping third-party photos; this keeps
   the repository free of licensed assets and works offline.
 - **Deviations from the design, on purpose:** the composer has an explicit Send button and a keyboard hint; message
-  streams show a day divider; the delete affordance only appears on your own messages (the mock shows it on
-  someone else's message, which would be a permissions bug in a real product).
+  streams show a day divider. Quote and delete actions are available on every message in this demo.
 - **Markdown-lite** formatting (`**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, lists) is rendered to React
   elements — never `innerHTML` — so a message cannot inject markup.
 
@@ -380,7 +377,7 @@ All values have working defaults — `.env` is optional (see `.env.example`).
 - **No attachments.** The design shows an attachment icon; file upload storage is a separate concern (S3 + signed
   URLs) and was skipped.
 - **Full-text search is not implemented** — the two search inputs filter the loaded list client-side.
-- **Token storage** uses `localStorage` for simplicity. A production app would prefer an httpOnly refresh cookie
-  plus short-lived access tokens.
+- **Demo login.** Only the selected user ID is stored in `localStorage`; passwords are checked at login and
+  never stored in the browser. This assignment version intentionally omits request authentication and access control.
 - **Unread reconciliation.** Counters are maintained incrementally; a background job recomputing them from
   `lastReadAt` would be the safety net in production.

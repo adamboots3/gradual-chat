@@ -1,6 +1,7 @@
 import { GraphQLScalarType, Kind } from 'graphql';
-import { requireUser, type GraphQLContext } from '../auth/context';
-import { signAuthToken, verifyPassword } from '../auth/jwt';
+import { Types } from 'mongoose';
+import type { GraphQLContext } from './context';
+import { verifyPassword } from '../services/passwords';
 import { User } from '../models/User';
 import { getChannelForUser, listChannelsForUser } from '../services/channels';
 import {
@@ -13,7 +14,7 @@ import {
 import { markChannelRead } from '../services/readState';
 import { toUserDTO } from './dto';
 import { escapeRegExp } from '../utils/regex';
-import { unauthenticated } from '../utils/errors';
+import { badUserInput, notFound } from '../utils/errors';
 
 const DateTime = new GraphQLScalarType({
   name: 'DateTime',
@@ -33,11 +34,13 @@ const DateTime = new GraphQLScalarType({
 export const resolvers = {
   DateTime,
   Query: {
-    me: (_parent: unknown, _args: unknown, context: GraphQLContext) =>
-      context.user ? toUserDTO(context.user) : null,
+    user: async (_parent: unknown, args: { id: string }) => {
+      if (!Types.ObjectId.isValid(args.id)) return null;
+      const user = await User.findById(args.id);
+      return user ? toUserDTO(user) : null;
+    },
 
-    users: async (_parent: unknown, args: { query: string }, context: GraphQLContext) => {
-      requireUser(context);
+    users: async (_parent: unknown, args: { query: string }) => {
       const term = args.query.trim();
       const filter = term
         ? {
@@ -51,18 +54,15 @@ export const resolvers = {
       return users.map(toUserDTO);
     },
 
-    channels: async (_parent: unknown, _args: unknown, context: GraphQLContext) => {
-      const user = requireUser(context);
-      return listChannelsForUser(String(user._id));
+    channels: async (_parent: unknown, args: { userId: string }) => {
+      return listChannelsForUser(args.userId);
     },
 
     messages: async (
       _parent: unknown,
       args: { channelId: string; cursor?: string | null; limit?: number | null },
-      context: GraphQLContext,
     ) => {
-      const user = requireUser(context);
-      return listMessages(args, String(user._id));
+      return listMessages(args);
     },
   },
 
@@ -70,36 +70,32 @@ export const resolvers = {
     login: async (_parent: unknown, args: { email: string; password: string }) => {
       const email = args.email.trim().toLowerCase();
       const user = await User.findOne({ email });
-      if (!user) throw unauthenticated('Invalid email or password.');
+      if (!user) throw badUserInput('Invalid email or password.');
       const ok = await verifyPassword(args.password, user.passwordHash);
-      if (!ok) throw unauthenticated('Invalid email or password.');
-      return {
-        token: signAuthToken(String(user._id), user.username),
-        user: toUserDTO(user),
-      };
+      if (!ok) throw badUserInput('Invalid email or password.');
+      return toUserDTO(user);
     },
 
     sendMessage: async (
       _parent: unknown,
-      args: { input: SendMessageInput },
+      args: { input: SendMessageInput; userId: string },
       context: GraphQLContext,
     ) => {
-      const user = requireUser(context);
-      const result = await sendMessage(args.input, String(user._id));
+      const result = await sendMessage(args.input, args.userId);
       await context.emitter.messageCreated(result);
       return result.message;
     },
 
     markChannelRead: async (
       _parent: unknown,
-      args: { channelId: string; lastMessageId?: string | null },
-      context: GraphQLContext,
+      args: { channelId: string; userId: string; lastMessageId?: string | null },
     ) => {
-      const user = requireUser(context);
-      // Throws when the caller is not a member of the channel.
-      await getChannelForUser(args.channelId, String(user._id));
-      await markChannelRead(args.channelId, String(user._id), args.lastMessageId ?? null);
-      return getChannelForUser(args.channelId, String(user._id));
+      await getChannelForUser(args.channelId, args.userId);
+      if (!Types.ObjectId.isValid(args.userId) || !(await User.exists({ _id: args.userId }))) {
+        throw notFound('User not found.');
+      }
+      await markChannelRead(args.channelId, args.userId, args.lastMessageId ?? null);
+      return getChannelForUser(args.channelId, args.userId);
     },
 
     editMessage: async (
@@ -107,15 +103,13 @@ export const resolvers = {
       args: { id: string; body: string },
       context: GraphQLContext,
     ) => {
-      const user = requireUser(context);
-      const result = await editMessage(args.id, args.body, String(user._id));
+      const result = await editMessage(args.id, args.body);
       await context.emitter.messageUpdated(result);
       return result.message;
     },
 
     deleteMessage: async (_parent: unknown, args: { id: string }, context: GraphQLContext) => {
-      const user = requireUser(context);
-      const result = await deleteMessage(args.id, String(user._id));
+      const result = await deleteMessage(args.id);
       await context.emitter.messageDeleted(result);
       return result.message;
     },

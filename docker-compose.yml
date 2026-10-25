@@ -21,7 +21,6 @@ services:
       NODE_ENV: production
       PORT: 4000
       MONGODB_URI: mongodb://mongo:27017/gradual_chat
-      JWT_SECRET: ${JWT_SECRET:-change-me-before-deploying}
       SEED_ON_START: 'true'
     ports:
       - '4000:4000'

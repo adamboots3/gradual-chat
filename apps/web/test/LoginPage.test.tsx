@@ -13,16 +13,12 @@ const loginMock = {
   result: {
     data: {
       login: {
-        __typename: 'AuthPayload',
-        token: 'test-token',
-        user: {
-          __typename: 'User',
-          id: 'u1',
-          name: 'Jenny White',
-          username: 'jenny',
-          avatarColor: '#7FD8BD',
-          title: 'Community Manager',
-        },
+        __typename: 'User',
+        id: 'u1',
+        name: 'Jenny White',
+        username: 'jenny',
+        avatarColor: '#7FD8BD',
+        title: 'Community Manager',
       },
     },
   },
@@ -40,7 +36,7 @@ describe('LoginPage', () => {
   it('prefills the first demo account and lists the others', () => {
     render(
       <MockedProvider mocks={[]}>
-        <LoginPage onAuthenticated={vi.fn()} />
+        <LoginPage onSignedIn={vi.fn()} />
       </MockedProvider>,
     );
 
@@ -53,7 +49,7 @@ describe('LoginPage', () => {
   it('switches the form to another demo account', async () => {
     render(
       <MockedProvider mocks={[]}>
-        <LoginPage onAuthenticated={vi.fn()} />
+        <LoginPage onSignedIn={vi.fn()} />
       </MockedProvider>,
     );
 
@@ -61,30 +57,34 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('devon@gradual.com');
   });
 
-  it('returns the token on a successful sign in', async () => {
-    const onAuthenticated = vi.fn();
+  it('returns the user on a successful sign in', async () => {
+    const onSignedIn = vi.fn();
     render(
       <MockedProvider mocks={[loginMock]}>
-        <LoginPage onAuthenticated={onAuthenticated} />
+        <LoginPage onSignedIn={onSignedIn} />
       </MockedProvider>,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith('test-token'));
+    await waitFor(() =>
+      expect(onSignedIn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'u1', username: 'jenny' }),
+      ),
+    );
   });
 
   it('surfaces an error message and stays on the form', async () => {
-    const onAuthenticated = vi.fn();
+    const onSignedIn = vi.fn();
     render(
       <MockedProvider mocks={[failedLoginMock]}>
-        <LoginPage onAuthenticated={onAuthenticated} />
+        <LoginPage onSignedIn={onSignedIn} />
       </MockedProvider>,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Invalid email or password/);
-    expect(onAuthenticated).not.toHaveBeenCalled();
+    expect(onSignedIn).not.toHaveBeenCalled();
   });
 });

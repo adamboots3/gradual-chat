@@ -24,9 +24,9 @@ export interface RealtimeClient {
  * A thin socket.io wrapper. It reuses the same origin as the web app so the dev
  * server (Vite) can proxy `/socket.io` and production needs no CORS at all.
  */
-export function connectRealtime(token: string, handlers: RealtimeHandlers): RealtimeClient {
+export function connectRealtime(userId: string, handlers: RealtimeHandlers): RealtimeClient {
   const socket = io({
-    auth: { token },
+    query: { userId },
     transports: ['websocket', 'polling'],
     reconnectionDelay: 500,
   });

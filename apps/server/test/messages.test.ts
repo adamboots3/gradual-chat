@@ -90,14 +90,14 @@ describe('sendMessage', () => {
     ).rejects.toThrow(/same channel/i);
   });
 
-  it('rejects empty bodies and non-members', async () => {
+  it('rejects empty bodies and unknown users', async () => {
     await expect(
       sendMessage({ channelId: fx.channelId, body: '   ' }, String(fx.jenny._id)),
     ).rejects.toThrow(/empty/i);
 
     await expect(
-      sendMessage({ channelId: fx.otherChannelId, body: 'hi' }, String(fx.devon._id)),
-    ).rejects.toThrow(/access/i);
+      sendMessage({ channelId: fx.channelId, body: 'hi' }, '000000000000000000000000'),
+    ).rejects.toThrow(/user not found/i);
   });
 });
 
@@ -107,13 +107,13 @@ describe('unread bookkeeping', () => {
       { channelId: fx.channelId, body: 'hello @devon' },
       String(fx.jenny._id),
     );
-    const edited = await editMessage(sent.message.id, 'hello @grace', String(fx.jenny._id));
+    const edited = await editMessage(sent.message.id, 'hello @grace');
     expect(edited.message.mentions.map((user) => user.username)).toEqual(['grace']);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
     expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
-    await editMessage(sent.message.id, 'hello @grace again', String(fx.jenny._id));
+    await editMessage(sent.message.id, 'hello @grace again');
     expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
-    await deleteMessage(sent.message.id, String(fx.jenny._id));
+    await deleteMessage(sent.message.id);
     expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(0);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
   });
@@ -124,7 +124,7 @@ describe('unread bookkeeping', () => {
       String(fx.jenny._id),
     );
     await markChannelRead(fx.channelId, String(fx.devon._id));
-    await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
+    await editMessage(sent.message.id, 'hello @devon');
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
   });
 
@@ -140,7 +140,7 @@ describe('unread bookkeeping', () => {
     const sent = await sendMessage({ channelId: fx.channelId, body: 'oops' }, String(fx.jenny._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
 
-    await deleteMessage(sent.message.id, String(fx.jenny._id));
+    await deleteMessage(sent.message.id);
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
 
     const stored = await Message.findById(sent.message.id);
@@ -168,29 +168,31 @@ describe('listMessages', () => {
       );
     }
 
-    const first = await listMessages({ channelId: fx.channelId, limit: 2 }, String(fx.jenny._id));
+    const first = await listMessages({ channelId: fx.channelId, limit: 2 });
     expect(first.messages.map((message) => message.body)).toEqual(['message 3', 'message 4']);
     expect(first.nextCursor).toBeTruthy();
 
-    const second = await listMessages(
-      { channelId: fx.channelId, limit: 2, cursor: first.nextCursor },
-      String(fx.jenny._id),
-    );
+    const second = await listMessages({
+      channelId: fx.channelId,
+      limit: 2,
+      cursor: first.nextCursor,
+    });
     expect(second.messages.map((message) => message.body)).toEqual(['message 1', 'message 2']);
 
-    const third = await listMessages(
-      { channelId: fx.channelId, limit: 2, cursor: second.nextCursor },
-      String(fx.jenny._id),
-    );
+    const third = await listMessages({
+      channelId: fx.channelId,
+      limit: 2,
+      cursor: second.nextCursor,
+    });
     expect(third.messages.map((message) => message.body)).toEqual(['message 0']);
     expect(third.nextCursor).toBeNull();
   });
 
   it('hides deleted messages', async () => {
     const sent = await sendMessage({ channelId: fx.channelId, body: 'gone' }, String(fx.jenny._id));
-    await deleteMessage(sent.message.id, String(fx.jenny._id));
+    await deleteMessage(sent.message.id);
 
-    const page = await listMessages({ channelId: fx.channelId }, String(fx.jenny._id));
+    const page = await listMessages({ channelId: fx.channelId });
     expect(page.messages).toHaveLength(0);
   });
 });

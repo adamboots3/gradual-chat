@@ -2,17 +2,9 @@ import { Server as SocketServer } from 'socket.io';
 import type { Server as HttpServer } from 'http';
 import { config } from '../config';
 import { logger } from '../logger';
-import { verifyAuthToken } from '../auth/jwt';
 import { Channel } from '../models/Channel';
-import { User } from '../models/User';
 import { ReadState } from '../models/ReadState';
 import type { MessageEvent, RealtimeEmitter } from './emitter';
-
-interface SocketUser {
-  id: string;
-  name: string;
-  username: string;
-}
 
 export interface RealtimeServer {
   io: SocketServer;
@@ -35,31 +27,17 @@ export async function createRealtime(httpServer: HttpServer): Promise<RealtimeSe
     serveClient: false,
   });
 
-  io.use(async (socket, next) => {
-    const token = (socket.handshake.auth as { token?: string } | undefined)?.token;
-    const payload = token ? verifyAuthToken(token) : null;
-    if (!payload) {
-      next(new Error('UNAUTHENTICATED'));
-      return;
-    }
-    const user = await User.findById(payload.sub).select('name username').lean();
-    if (!user) {
-      next(new Error('UNAUTHENTICATED'));
-      return;
-    }
-    socket.data.user = { id: String(user._id), name: user.name, username: user.username };
-    next();
-  });
-
   io.on('connection', async (socket) => {
-    const me = socket.data.user as SocketUser;
-    socket.join(`user:${me.id}`);
+    // The demo user ID routes events; it is not an authentication credential.
+    const userId = socket.handshake.query.userId;
+    if (typeof userId !== 'string' || !/^[a-f0-9]{24}$/i.test(userId)) return;
+    socket.join(`user:${userId}`);
 
-    const channels = await Channel.find({ memberIds: me.id }).select('_id').lean();
+    const channels = await Channel.find({ memberIds: userId }).select('_id').lean();
     for (const channel of channels) socket.join(`channel:${channel._id}`);
 
     socket.on('disconnect', () => {
-      logger.debug({ userId: me.id }, 'socket disconnected');
+      logger.debug({ userId }, 'socket disconnected');
     });
   });
 

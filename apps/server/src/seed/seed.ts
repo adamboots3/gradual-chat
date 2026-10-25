@@ -3,7 +3,7 @@ import { User } from '../models/User';
 import { Channel } from '../models/Channel';
 import { Message } from '../models/Message';
 import { ReadState } from '../models/ReadState';
-import { hashPassword } from '../auth/jwt';
+import { hashPassword } from '../services/passwords';
 import { extractMentionHandles } from '../services/mentions';
 import { logger } from '../logger';
 import { DEMO_PASSWORD, seedChannels, seedMessages, seedUsers } from './data';

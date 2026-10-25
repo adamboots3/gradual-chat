@@ -7,7 +7,7 @@ import { toMessageDTO, type MessageDTO } from '../graphql/dto';
 import type { MessageLike } from '../graphql/dto-types';
 import type { MessageEvent } from '../realtime/emitter';
 import { encodeCursor, decodeCursor, clampLimit } from '../utils/cursor';
-import { badUserInput, forbidden, notFound } from '../utils/errors';
+import { badUserInput, notFound } from '../utils/errors';
 import { extractMentionHandles } from './mentions';
 import { bumpUnread, markAuthorRead } from './readState';
 
@@ -17,15 +17,10 @@ const POPULATE_MESSAGE: PopulateOptions[] = [
   { path: 'mentionIds', select: 'name username avatarColor title' },
 ];
 
-export async function assertChannelMember(
-  channelId: string,
-  userId: string,
-): Promise<ChannelDocument> {
+export async function getChannel(channelId: string): Promise<ChannelDocument> {
   if (!Types.ObjectId.isValid(channelId)) throw notFound('Channel not found.');
   const channel = await Channel.findById(channelId);
   if (!channel) throw notFound('Channel not found.');
-  const isMember = channel.memberIds.some((id) => String(id) === String(userId));
-  if (!isMember) throw forbidden();
   return channel;
 }
 
@@ -56,7 +51,10 @@ export async function sendMessage(
   input: SendMessageInput,
   userId: string,
 ): Promise<SendMessageResult> {
-  const channel = await assertChannelMember(input.channelId, userId);
+  const channel = await getChannel(input.channelId);
+  if (!Types.ObjectId.isValid(userId) || !(await User.exists({ _id: userId }))) {
+    throw notFound('User not found.');
+  }
 
   const body = input.body.trim();
   if (body.length === 0) throw badUserInput('Message cannot be empty.');
@@ -103,11 +101,12 @@ export interface MessagePage {
   nextCursor: string | null;
 }
 
-export async function listMessages(
-  params: { channelId: string; cursor?: string | null; limit?: number | null },
-  userId: string,
-): Promise<MessagePage> {
-  await assertChannelMember(params.channelId, userId);
+export async function listMessages(params: {
+  channelId: string;
+  cursor?: string | null;
+  limit?: number | null;
+}): Promise<MessagePage> {
+  await getChannel(params.channelId);
 
   const limit = clampLimit(params.limit);
   const filter: FilterQuery<unknown> = { channelId: params.channelId, deletedAt: null };
@@ -133,23 +132,15 @@ export async function listMessages(
 
 export type MessageMutationResult = MessageEvent;
 
-export async function editMessage(
-  messageId: string,
-  body: string,
-  userId: string,
-): Promise<MessageMutationResult> {
+export async function editMessage(messageId: string, body: string): Promise<MessageMutationResult> {
   const trimmed = body.trim();
   if (trimmed.length === 0) throw badUserInput('Message cannot be empty.');
 
   const message = await Message.findOne({ _id: messageId, deletedAt: null });
   if (!message) throw notFound('Message not found.');
-  if (String(message.authorId) !== String(userId)) {
-    throw forbidden('You can only edit your own messages.');
-  }
-
   message.body = trimmed;
   message.editedAt = new Date();
-  message.mentionIds = await resolveMentionIds(trimmed, userId);
+  message.mentionIds = await resolveMentionIds(trimmed, String(message.authorId));
   await message.save();
 
   const channel = await Channel.findById(message.channelId);
@@ -161,16 +152,9 @@ export async function editMessage(
   };
 }
 
-export async function deleteMessage(
-  messageId: string,
-  userId: string,
-): Promise<MessageMutationResult> {
+export async function deleteMessage(messageId: string): Promise<MessageMutationResult> {
   const message = await Message.findOne({ _id: messageId, deletedAt: null });
   if (!message) throw notFound('Message not found.');
-  if (String(message.authorId) !== String(userId)) {
-    throw forbidden('You can only delete your own messages.');
-  }
-
   const channelId = message.channelId;
   const authorId = message.authorId;
 

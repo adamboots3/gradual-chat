@@ -46,11 +46,6 @@ type Channel {
   lastMessage: MessagePreview
 }
 
-type AuthPayload {
-  token: String!
-  user: User!
-}
-
 type MessagePage {
   messages: [Message!]!
   nextCursor: String
@@ -63,19 +58,19 @@ input SendMessageInput {
 }
 
 type Query {
-  me: User
+  user(id: ID!): User
   """
   Typeahead source for the @mention picker.
   """
   users(query: String!): [User!]!
-  channels: [Channel!]!
+  channels(userId: ID!): [Channel!]!
   messages(channelId: ID!, cursor: String, limit: Int): MessagePage!
 }
 
 type Mutation {
-  login(email: String!, password: String!): AuthPayload!
-  sendMessage(input: SendMessageInput!): Message!
-  markChannelRead(channelId: ID!, lastMessageId: ID): Channel!
+  login(email: String!, password: String!): User!
+  sendMessage(input: SendMessageInput!, userId: ID!): Message!
+  markChannelRead(channelId: ID!, userId: ID!, lastMessageId: ID): Channel!
   editMessage(id: ID!, body: String!): Message!
   deleteMessage(id: ID!): Message!
 }

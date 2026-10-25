@@ -4,7 +4,7 @@ import {
   CHANNELS,
   DELETE_MESSAGE,
   MARK_CHANNEL_READ,
-  ME,
+  USER,
   MESSAGES,
   SEND_MESSAGE,
 } from '../graphql/operations';
@@ -27,23 +27,29 @@ interface MessagesVars {
 }
 
 interface ChatPageProps {
-  token: string;
+  userId: string;
   onSignOut: () => void;
 }
 
-export function ChatPage({ token, onSignOut }: ChatPageProps) {
+export function ChatPage({ userId, onSignOut }: ChatPageProps) {
   const client = useApolloClient();
-  const { data: meData, loading: meLoading, error: meError } = useQuery<{ me: User | null }>(ME);
+  const {
+    data: meData,
+    loading: meLoading,
+    error: meError,
+  } = useQuery<{ user: User | null }>(USER, {
+    variables: { id: userId },
+  });
   const { data: channelData, loading: channelsLoading } = useQuery<{ channels: Channel[] }>(
     CHANNELS,
-    { skip: !meData?.me },
+    { variables: { userId }, skip: !meData?.user },
   );
 
   const [markRead] = useMutation(MARK_CHANNEL_READ);
   const [sendMessage] = useMutation(SEND_MESSAGE);
   const [deleteMessage] = useMutation(DELETE_MESSAGE);
 
-  const me = meData?.me ?? null;
+  const me = meData?.user ?? null;
   const channels = useMemo(() => channelData?.channels ?? [], [channelData]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -71,9 +77,9 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
     if (!channel) return;
     if (channel.unreadCount === 0) return;
     void markRead({
-      variables: { channelId: activeId, lastMessageId: channel.lastMessage?.id ?? null },
+      variables: { userId, channelId: activeId, lastMessageId: channel.lastMessage?.id ?? null },
     });
-  }, [activeId, channels, markRead]);
+  }, [activeId, channels, markRead, userId]);
 
   const appendMessage = useCallback(
     (incoming: Message) => {
@@ -89,18 +95,21 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
         },
       );
 
-      client.cache.updateQuery<{ channels: Channel[] }>({ query: CHANNELS }, (data) => {
-        if (!data) return data;
-        return {
-          channels: data.channels.map((channel) =>
-            channel.id === message.channelId
-              ? patchChannel(channel, { lastMessage: messageToPreview(message) })
-              : channel,
-          ),
-        };
-      });
+      client.cache.updateQuery<{ channels: Channel[] }>(
+        { query: CHANNELS, variables: { userId } },
+        (data) => {
+          if (!data) return data;
+          return {
+            channels: data.channels.map((channel) =>
+              channel.id === message.channelId
+                ? patchChannel(channel, { lastMessage: messageToPreview(message) })
+                : channel,
+            ),
+          };
+        },
+      );
     },
-    [client],
+    [client, userId],
   );
 
   const removeMessage = useCallback(
@@ -112,21 +121,24 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
 
   const updateChannelBadge = useCallback(
     (channelId: string, unreadCount: number) => {
-      client.cache.updateQuery<{ channels: Channel[] }>({ query: CHANNELS }, (data) => {
-        if (!data) return data;
-        return {
-          channels: data.channels.map((channel) =>
-            channel.id === channelId ? patchChannel(channel, { unreadCount }) : channel,
-          ),
-        };
-      });
+      client.cache.updateQuery<{ channels: Channel[] }>(
+        { query: CHANNELS, variables: { userId } },
+        (data) => {
+          if (!data) return data;
+          return {
+            channels: data.channels.map((channel) =>
+              channel.id === channelId ? patchChannel(channel, { unreadCount }) : channel,
+            ),
+          };
+        },
+      );
     },
-    [client],
+    [client, userId],
   );
 
   useEffect(() => {
     if (!me) return;
-    const realtime: RealtimeClient = connectRealtime(token, {
+    const realtime: RealtimeClient = connectRealtime(userId, {
       // A socket can connect before the gateway has finished joining its channel
       // rooms, and messages sent while disconnected are never replayed — so we
       // reconcile from the source of truth on every (re)connect.
@@ -137,7 +149,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
         appendMessage(message);
         if (message.channelId === activeIdRef.current && message.author.id !== me.id) {
           void markRead({
-            variables: { channelId: message.channelId, lastMessageId: message.id },
+            variables: { userId, channelId: message.channelId, lastMessageId: message.id },
           });
         }
       },
@@ -170,7 +182,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
     return () => {
       realtime.disconnect();
     };
-  }, [token, me, appendMessage, removeMessage, updateChannelBadge, markRead, client]);
+  }, [userId, me, appendMessage, removeMessage, updateChannelBadge, markRead, client]);
 
   const activeChannel = channels.find((channel) => channel.id === activeId) ?? null;
   const unreadTotal = channels.reduce((total, channel) => total + channel.unreadCount, 0);
@@ -178,7 +190,7 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   const handleSend = async (body: string, replyToId: string | null) => {
     if (!activeId) return;
     const result = await sendMessage({
-      variables: { input: { channelId: activeId, body, replyToId } },
+      variables: { userId, input: { channelId: activeId, body, replyToId } },
     });
     const message = result.data?.sendMessage as Message | undefined;
     if (message) appendMessage(message);
@@ -203,7 +215,11 @@ export function ChatPage({ token, onSignOut }: ChatPageProps) {
   if (meError || !me) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-        <p className="text-[14px] text-content">Your session expired.</p>
+        <p className="text-[14px] text-content">
+          {meError
+            ? 'Could not load your user. Please try signing in again.'
+            : 'This demo user no longer exists.'}
+        </p>
         <button
           type="button"
           onClick={onSignOut}

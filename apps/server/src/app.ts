@@ -3,7 +3,7 @@ import { join } from 'path';
 import express, { type Express } from 'express';
 import { expressMiddleware } from '@as-integrations/express4';
 import type { ApolloServer } from '@apollo/server';
-import { buildContext, type GraphQLContext } from './auth/context';
+import type { GraphQLContext } from './graphql/context';
 import type { RealtimeEmitter } from './realtime/emitter';
 import { logger } from './logger';
 
@@ -25,7 +25,7 @@ export function mountHttpRoutes(
     '/graphql',
     express.json({ limit: '256kb' }),
     expressMiddleware(apollo, {
-      context: async ({ req }) => buildContext(req.headers, emitter),
+      context: async () => ({ emitter }),
     }),
   );
 
@@ -49,7 +49,12 @@ export function mountHttpRoutes(
   }
 
   app.use(
-    (err: Error & { status?: number; statusCode?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    (
+      err: Error & { status?: number; statusCode?: number },
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
       const status = err.status ?? err.statusCode ?? 500;
       if (status >= 500) {
         logger.error({ err }, 'unhandled request error');

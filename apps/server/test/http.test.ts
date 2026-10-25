@@ -39,12 +39,11 @@ beforeEach(async () => {
   fx = await createFixture();
 });
 
-async function graphql(query: string, token?: string): Promise<Response> {
+async function graphql(query: string): Promise<Response> {
   return fetch(`${baseUrl}/graphql`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query }),
   });
@@ -58,25 +57,31 @@ describe('HTTP surface', () => {
   });
 
   it('serves GraphQL over POST', async () => {
-    const response = await graphql(`{ __typename }`);
+    const response =
+      await graphql(`
+        {
+          __typename
+        }
+      `);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { data?: { __typename?: string } };
     expect(body.data?.__typename).toBe('Query');
   });
 
-  it('rejects a query without a bearer token', async () => {
-    const response = await graphql(`{ channels { id } }`);
+  it('reads a channel timeline without login', async () => {
+    const response = await graphql(
+      `{ messages(channelId: "${fx.otherChannelId}") { messages { id } } }`,
+    );
     const body = (await response.json()) as {
-      errors?: Array<{ extensions?: { code?: string } }>;
+      data?: { messages: { messages: unknown[] } };
+      errors?: unknown;
     };
-    expect(body.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+    expect(body.errors).toBeUndefined();
+    expect(body.data?.messages.messages).toEqual([]);
   });
 
-  it('accepts a query with a valid token', async () => {
-    const { signAuthToken } = await import('../src/auth/jwt');
-    const token = signAuthToken(String(fx.jenny._id), 'jenny');
-
-    const response = await graphql(`{ channels { id name } }`, token);
+  it('lists channels using the supplied user ID', async () => {
+    const response = await graphql(`{ channels(userId: "${fx.jenny._id}") { id name } }`);
     const body = (await response.json()) as {
       data?: { channels: Array<{ id: string }> };
       errors?: unknown;

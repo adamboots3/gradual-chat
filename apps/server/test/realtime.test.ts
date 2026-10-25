@@ -3,7 +3,6 @@ import type { AddressInfo } from 'node:net';
 import express from 'express';
 import { io as createClient, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { signAuthToken } from '../src/auth/jwt';
 import { createRealtime, type RealtimeServer } from '../src/realtime';
 import { editMessage, sendMessage } from '../src/services/messages';
 import { resetDatabase, startTestDatabase, type TestDatabase } from './helpers/db';
@@ -39,9 +38,9 @@ beforeEach(async () => {
   fx = await createFixture();
 });
 
-function connect(token?: string): Socket {
+function connect(userId?: string): Socket {
   const client = createClient(url, {
-    auth: token ? { token } : {},
+    query: userId ? { userId } : {},
     transports: ['websocket'],
     reconnection: false,
   });
@@ -79,27 +78,27 @@ describe('socket.io gateway', () => {
       { channelId: fx.channelId, body: 'hello' },
       String(fx.jenny._id),
     );
-    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
+    const devon = connect(String(fx.devon._id));
     await waitFor(devon, 'connect');
     await waitForRoom(`channel:${fx.channelId}`, String(devon.id));
     const messagePromise = waitFor<{
       message: { body: string; mentions: Array<{ username: string }> };
     }>(devon, 'message:updated');
-    const edited = await editMessage(sent.message.id, 'hello @devon', String(fx.jenny._id));
+    const edited = await editMessage(sent.message.id, 'hello @devon');
     await realtime.emitter.messageUpdated(edited);
     const payload = await messagePromise;
     expect(payload.message.body).toBe('hello @devon');
     expect(payload.message.mentions.map((user) => user.username)).toEqual(['devon']);
   });
 
-  it('rejects a socket without a valid token', async () => {
+  it('accepts a socket without credentials', async () => {
     const client = connect();
-    const error = await waitFor<Error>(client, 'connect_error');
-    expect(error.message).toBe('UNAUTHENTICATED');
+    await waitFor(client, 'connect');
+    expect(client.connected).toBe(true);
   });
 
   it('delivers a new message to the other channel member only', async () => {
-    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
+    const devon = connect(String(fx.devon._id));
     await waitFor(devon, 'connect');
     await waitForRoom(`channel:${fx.channelId}`, String(devon.id));
 
@@ -120,7 +119,7 @@ describe('socket.io gateway', () => {
   });
 
   it('pushes the unread badge to the recipient', async () => {
-    const devon = connect(signAuthToken(String(fx.devon._id), 'devon'));
+    const devon = connect(String(fx.devon._id));
     await waitFor(devon, 'connect');
 
     const badgePromise = waitFor<{

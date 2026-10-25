@@ -2,27 +2,29 @@ import { useState } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ChatPage } from './pages/ChatPage';
-import { getStoredToken, storeToken } from './lib/apollo';
+import { apolloClient, getStoredUserId, storeUserId } from './lib/apollo';
+import type { User } from './types';
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(() => getStoredToken());
+  const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
 
-  const handleAuthenticated = (nextToken: string) => {
-    storeToken(nextToken);
-    setToken(nextToken);
+  const handleSignedIn = (user: User) => {
+    storeUserId(user.id);
+    setUserId(user.id);
   };
 
   const handleSignOut = () => {
-    storeToken(null);
-    setToken(null);
+    storeUserId(null);
+    setUserId(null);
+    void apolloClient.clearStore();
   };
 
   return (
     <ErrorBoundary>
-      {token ? (
-        <ChatPage token={token} onSignOut={handleSignOut} />
+      {userId ? (
+        <ChatPage userId={userId} onSignOut={handleSignOut} />
       ) : (
-        <LoginPage onAuthenticated={handleAuthenticated} />
+        <LoginPage onSignedIn={handleSignedIn} />
       )}
     </ErrorBoundary>
   );

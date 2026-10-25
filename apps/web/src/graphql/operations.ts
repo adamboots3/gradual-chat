@@ -58,9 +58,9 @@ export const CHANNEL_FIELDS = gql`
   ${USER_FIELDS}
 `;
 
-export const ME = gql`
-  query Me {
-    me {
+export const USER = gql`
+  query User($id: ID!) {
+    user(id: $id) {
       ...UserFields
     }
   }
@@ -70,18 +70,15 @@ export const ME = gql`
 export const LOGIN = gql`
   mutation Login($email: String!, $password: String!) {
     login(email: $email, password: $password) {
-      token
-      user {
-        ...UserFields
-      }
+      ...UserFields
     }
   }
   ${USER_FIELDS}
 `;
 
 export const CHANNELS = gql`
-  query Channels {
-    channels {
+  query Channels($userId: ID!) {
+    channels(userId: $userId) {
       ...ChannelFields
     }
   }
@@ -101,8 +98,8 @@ export const MESSAGES = gql`
 `;
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage($input: SendMessageInput!) {
-    sendMessage(input: $input) {
+  mutation SendMessage($input: SendMessageInput!, $userId: ID!) {
+    sendMessage(input: $input, userId: $userId) {
       ...MessageFields
     }
   }
@@ -119,8 +116,8 @@ export const DELETE_MESSAGE = gql`
 `;
 
 export const MARK_CHANNEL_READ = gql`
-  mutation MarkChannelRead($channelId: ID!, $lastMessageId: ID) {
-    markChannelRead(channelId: $channelId, lastMessageId: $lastMessageId) {
+  mutation MarkChannelRead($channelId: ID!, $userId: ID!, $lastMessageId: ID) {
+    markChannelRead(channelId: $channelId, userId: $userId, lastMessageId: $lastMessageId) {
       id
       unreadCount
     }

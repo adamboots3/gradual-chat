@@ -1,23 +1,22 @@
-import { ApolloClient, ApolloLink, HttpLink, InMemoryCache, from } from '@apollo/client';
-import { onError } from '@apollo/client/link/error';
+import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 import type { Message } from '../types';
 
-export const TOKEN_STORAGE_KEY = 'gradual.token';
+export const USER_STORAGE_KEY = 'gradual.userId';
 
-export function getStoredToken(): string | null {
+export function getStoredUserId(): string | null {
   try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    return window.localStorage.getItem(USER_STORAGE_KEY);
   } catch {
     return null;
   }
 }
 
-export function storeToken(token: string | null): void {
+export function storeUserId(userId: string | null): void {
   try {
-    if (token) window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    else window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    if (userId) window.localStorage.setItem(USER_STORAGE_KEY, userId);
+    else window.localStorage.removeItem(USER_STORAGE_KEY);
   } catch {
-    /* storage can be disabled 鈥?the app still works for this session */
+    /* The selected user stays in React state when local storage is unavailable. */
   }
 }
 
@@ -25,27 +24,6 @@ interface MessagePage {
   messages: Message[];
   nextCursor: string | null;
 }
-
-const authLink = new ApolloLink((operation, forward) => {
-  const token = getStoredToken();
-  operation.setContext(({ headers = {} }: { headers?: Record<string, string> }) => ({
-    headers: {
-      ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-  }));
-  return forward(operation);
-});
-
-const errorLink = onError(({ graphQLErrors, operation }) => {
-  const unauthenticated = graphQLErrors?.some(
-    (error) => error.extensions?.code === 'UNAUTHENTICATED',
-  );
-  if (unauthenticated && operation.operationName !== 'Login' && getStoredToken()) {
-    storeToken(null);
-    window.location.reload();
-  }
-});
 
 /**
  * Cache configuration is exported so tests (and alternative clients) get the
@@ -92,18 +70,9 @@ export function createCache(): InMemoryCache {
 }
 
 export const apolloClient = new ApolloClient({
-  link: from([
-    errorLink,
-    authLink,
-    new HttpLink({ uri: '/graphql', credentials: 'same-origin' }),
-  ]),
+  link: new HttpLink({ uri: '/graphql' }),
   cache: createCache(),
   defaultOptions: {
     watchQuery: { fetchPolicy: 'cache-and-network' },
   },
 });
-
-
-
-
-

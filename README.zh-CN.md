@@ -88,7 +88,7 @@ npm run seed -- --force
 | 题目要求              | 实现情况                                        | 主要代码位置                             |
 | --------------------- | ----------------------------------------------- | ---------------------------------------- |
 | 按设计实现 Web UI     | 已实现会话、悬停操作、引用回复、@候选列表等状态 | `apps/web/src/components`                |
-| 实时聊天              | Socket.IO、JWT 握手鉴权、频道房间               | `apps/server/src/realtime`               |
+| 实时聊天              | Socket.IO、频道房间、个人未读数推送             | `apps/server/src/realtime`               |
 | React.js + TypeScript | React 18、Vite、Apollo Client、Tailwind         | `apps/web`                               |
 | Node.js + TypeScript  | Express、Apollo Server、严格类型检查            | `apps/server`                            |
 | MongoDB               | Mongoose 模型、复合索引、未读计数               | `apps/server/src/models`                 |
@@ -96,7 +96,7 @@ npm run seed -- --force
 | 可选：未读数          | 频道未读消息徽标、已读状态                      | `apps/server/src/services/readState.ts`  |
 | 可选：引用回复        | 消息自引用、同频道校验、引用预览                | `apps/server/src/services/messages.ts`   |
 | 可选：@提及           | 解析、自动补全、高亮                            | `apps/server/src/services/mentions.ts`   |
-| 可选：前后端测试      | 108 个测试，前后端各 54 个                      | `apps/server/test`、`apps/web/test`      |
+| 可选：前后端测试      | 103 个测试，后端 49 个、前端 54 个              | `apps/server/test`、`apps/web/test`      |
 
 此外还提供消息分页、软删除、消息编辑 API、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。消息编辑目前通过 API 提供，前端未提供编辑入口。
 
@@ -129,7 +129,7 @@ sequenceDiagram
   participant B as 接收者：React + Apollo Client
   Note over A,B: 登录后建立 Socket.IO 连接，网关按频道成员身份加入房间
   A->>API: ① GraphQL / HTTP：发送消息 mutation
-  API->>API: 校验身份、频道权限和消息内容
+  API->>API: 校验消息内容和引用目标
   API->>DB: ② 通过 Mongoose 保存消息并更新未读数
   DB-->>API: 写入成功
   API->>RT: ③ 调用事件广播
@@ -146,7 +146,7 @@ sequenceDiagram
 
 发送消息的主要流程：
 
-1. 校验登录状态、频道成员权限、正文长度和引用目标所属频道。
+1. 请求携带当前用户 ID，校验正文长度和引用目标所属频道。
 2. 解析正文中的 `@username`，查询对应用户。
 3. 保存消息，为其他频道成员增加一次未读消息数，是否被提及不影响计数。
 4. 更新发送者的已读状态。
@@ -181,36 +181,38 @@ ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount }
 
 ```graphql
 type Query {
-  me: User
+  user(id: ID!): User
   users(query: String!): [User!]!
-  channels: [Channel!]!
+  channels(userId: ID!): [Channel!]!
   messages(channelId: ID!, cursor: String, limit: Int): MessagePage!
 }
 
 type Mutation {
-  login(email: String!, password: String!): AuthPayload!
-  sendMessage(input: SendMessageInput!): Message!
-  markChannelRead(channelId: ID!, lastMessageId: ID): Channel!
+  login(email: String!, password: String!): User!
+  sendMessage(input: SendMessageInput!, userId: ID!): Message!
+  markChannelRead(channelId: ID!, userId: ID!, lastMessageId: ID): Channel!
   editMessage(id: ID!, body: String!): Message!
   deleteMessage(id: ID!): Message!
 }
 ```
 
-先执行登录 mutation 获取 token：
+先执行登录 mutation。服务端校验密码后返回用户信息，密码使用 bcrypt 哈希存储：
 
 ```graphql
 mutation {
   login(email: "jenny@gradual.com", password: "password123") {
-    token
+    id
+    name
+    username
   }
 }
 ```
 
-后续请求携带 `Authorization: Bearer <token>` 请求头。例如查询频道：
+后续请求直接传入返回的用户 ID，不需要 Authorization 请求头。例如查询频道（将变量设为登录返回的 ID）：
 
 ```graphql
-query {
-  channels {
+query Channels($userId: ID!) {
+  channels(userId: $userId) {
     id
     name
     unreadCount
@@ -221,7 +223,9 @@ query {
 }
 ```
 
-错误通过 `extensions.code` 区分，包括 `UNAUTHENTICATED`、`FORBIDDEN`、`BAD_USER_INPUT` 和 `NOT_FOUND`。
+本版本保留账号密码登录，不维护 JWT 或服务端会话，也不做频道成员、消息作者权限校验。用户 ID 仅用于选择演示数据、记录发言人和未读数，不作为身份凭证。浏览器只保存用户 ID，不保存密码。
+
+错误通过 `extensions.code` 区分，包括 `BAD_USER_INPUT` 和 `NOT_FOUND`。
 
 ## 实时事件
 
@@ -232,7 +236,7 @@ query {
 | 服务端 → 客户端 | `message:deleted`              | `{ messageId, channelId }`                       |
 | 服务端 → 客户端 | `channel:unread`               | `{ channelId, unreadCount }`                    |
 
-Socket.IO 在握手阶段检查 `socket.auth.token`，拒绝无效身份。连接后加入 `user:<id>` 个人房间和用户所属的 `channel:<id>` 频道房间，分别用于未读计数推送和频道消息广播。
+Socket.IO 连接时通过 `query.userId` 传入用户 ID，不执行鉴权。网关根据该 ID 加入 `user:<id>` 个人房间和用户所属的 `channel:<id>` 频道房间，分别用于未读计数推送和频道消息广播。
 
 ## 项目结构
 
@@ -240,7 +244,6 @@ Socket.IO 在握手阶段检查 `socket.auth.token`，拒绝无效身份。连�
 apps/
 ├─ server/
 │  ├─ src/
-│  │  ├─ auth/       JWT 与 GraphQL 身份上下文
 │  │  ├─ db/         MongoDB 连接及临时实例回退
 │  │  ├─ graphql/    SDL、resolver 和 DTO
 │  │  ├─ models/     用户、频道、消息、已读状态模型
@@ -270,9 +273,9 @@ npm run lint
 npm run build
 ```
 
-当前共 **108 个测试：后端 54 个，前端 54 个**。
+当前共 **103 个测试：后端 49 个，前端 54 个**。
 
-后端测试使用独立的临时 MongoDB 实例，覆盖身份校验、频道权限、消息分页、引用校验、未读消息计数、提及解析、编辑删除、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
+后端测试使用独立的临时 MongoDB 实例，覆盖账号密码登录、用户查询、消息分页、引用校验、未读消息计数、提及解析、无鉴权的编辑删除及频道访问、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
 
 前端使用 Vitest 和 Testing Library，覆盖登录、消息渲染、频道徽标、输入框、引用回复、格式化、错误边界和 Apollo 缓存。回归测试包括中文输入法防误发送、发送失败保留草稿并重试、可见提及候选的键盘导航和按所属频道删除缓存消息。
 
@@ -288,7 +291,7 @@ npm run test:coverage
 npm run verify:realtime
 ```
 
-该脚本使用 Chrome 或 Edge 的两个独立会话，验证消息送达、未读徽标出现及打开频道后清零，并向当前开发数据库写入测试消息。
+该脚本使用 Chrome 或 Edge 的两个独立会话，验证消息送达、未读徽标出现及打开频道后清零、刷新保留当前用户和退出后切换账号，并向当前开发数据库写入测试消息。
 
 GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docker Compose 启动与 API 检查。工作流定义见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。
 
@@ -300,8 +303,6 @@ GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docke
 | ---------------- | ---------------------------------- | ---------------------------------------- |
 | `PORT`           | `4000`                             | API 与构建后前端的服务端口               |
 | `MONGODB_URI`    | 本地 MongoDB，不可用时回退临时实例 | 显式设置后连接失败即退出                 |
-| `JWT_SECRET`     | 开发密钥                           | 正式部署必须替换                         |
-| `JWT_EXPIRES_IN` | `7d`                               | 登录 token 有效期                        |
 | `SEED_ON_START`  | `true`                             | 用户集合为空时初始化演示数据             |
 | `LOG_LEVEL`      | `info`                             | pino 日志等级                            |
 | `WEB_ORIGIN`     | `http://localhost:5173`            | 前后端不同源时的 Socket.IO CORS 来源配置 |
@@ -311,7 +312,7 @@ GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docke
 - 采用设计参考中的深色面板、薄荷绿色消息气泡及红色未读徽标。
 - Inter 可变字体随项目提供，避免依赖外部字体 CDN。
 - 头像使用姓名缩写和用户配色，便于离线运行。
-- 在设计基础上增加发送按钮、键盘提示和日期分隔线；删除入口仅对消息作者显示。
+- 在设计基础上增加发送按钮、键盘提示和日期分隔线；所有消息均提供引用和删除入口。
 - 支持粗体、斜体、删除线、行内代码和列表。消息以 React 元素渲染，不注入原始 HTML。
 
 ## 取舍与后续改进
@@ -319,5 +320,5 @@ GitHub Actions 配置包含 lint、类型检查、测试、构建，以及 Docke
 - **单实例部署。** Socket.IO 房间保存在进程内，横向扩容需要共享适配器及在线状态存储。
 - **未实现附件上传。** 当前没有对象存储或文件上传流程。
 - **搜索范围有限。** 搜索用于前端已加载列表的过滤，未提供服务端全文检索。
-- **Token 存储。** 当前使用 `localStorage`，正式部署可改为短期访问 token 配合 httpOnly 刷新 cookie。
+- **简化登录。** `localStorage` 只保存当前用户 ID，登录时校验密码，后续接口不做身份与权限校验。
 - **未读一致性。** 当前增量维护计数，高并发场景仍需完善事务、一致性处理和定期校准机制。

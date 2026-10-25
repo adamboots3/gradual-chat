@@ -58,7 +58,11 @@ export function MessageItem({ message, isMine, onQuote, onDelete }: MessageItemP
             isMine ? 'rounded-tr-md' : 'rounded-tl-md'
           }`}
         >
-          <MessageBody body={message.body} mentions={message.mentions} tone={isMine ? 'light' : 'dark'} />
+          <MessageBody
+            body={message.body}
+            mentions={message.mentions}
+            tone={isMine ? 'light' : 'dark'}
+          />
         </div>
       </div>
 
@@ -73,17 +77,15 @@ export function MessageItem({ message, isMine, onQuote, onDelete }: MessageItemP
           >
             <QuoteIcon className="h-4 w-4" />
           </button>
-          {isMine ? (
-            <button
-              type="button"
-              onClick={() => onDelete(message)}
-              className="flex h-7 w-7 items-center justify-center rounded text-muted transition hover:bg-badge/20 hover:text-badge"
-              aria-label="Delete message"
-              title="Delete message"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => onDelete(message)}
+            className="flex h-7 w-7 items-center justify-center rounded text-muted transition hover:bg-badge/20 hover:text-badge"
+            aria-label="Delete message"
+            title="Delete message"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>

@@ -54,7 +54,7 @@ describe('MessageItem', () => {
     expect(screen.getByText(/Check out Vanilla Forums/)).toBeInTheDocument();
   });
 
-  it('offers quote on every message but delete only on my own', async () => {
+  it('offers quote and delete on every message', async () => {
     const onQuote = vi.fn();
     const onDelete = vi.fn();
 
@@ -63,12 +63,14 @@ describe('MessageItem', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Quote reply' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Delete message' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete message' }));
+    expect(onDelete).toHaveBeenCalledWith(baseMessage);
 
     rerender(<MessageItem message={baseMessage} isMine onQuote={onQuote} onDelete={onDelete} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete message' }));
     expect(onDelete).toHaveBeenCalledWith(baseMessage);
+    expect(onDelete).toHaveBeenCalledTimes(2);
   });
 
   it('marks the message as edited', () => {

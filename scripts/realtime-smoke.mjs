@@ -67,10 +67,14 @@ const second = `unread smoke ${Date.now()}`;
 await jenny.page.getByLabel(/Message Share your story/).fill(second);
 await jenny.page.getByLabel(/Message Share your story/).press('Enter');
 
-await devon.page.waitForFunction(() => {
-  const row = document.querySelector('button[aria-label="Share your story"]');
-  return Boolean(row && row.querySelector('.bg-badge'));
-}, null, { timeout: 8000 });
+await devon.page.waitForFunction(
+  () => {
+    const row = document.querySelector('button[aria-label="Share your story"]');
+    return Boolean(row && row.querySelector('.bg-badge'));
+  },
+  null,
+  { timeout: 8000 },
+);
 console.log('OK unread badge appears while the recipient is in another channel');
 
 // 3. opening the channel clears it
@@ -82,6 +86,27 @@ const badgeLeft = await devon.page.evaluate(() => {
 });
 if (badgeLeft) throw new Error('Unread badge should be cleared after opening the channel');
 console.log('OK unread badge clears after opening the channel');
+
+// 4. a refresh restores the selected user without a token
+await jenny.page.reload({ waitUntil: 'networkidle' });
+await waitForText(jenny.page, second);
+await jenny.page.getByRole('button', { name: 'Account menu' }).click();
+await waitForText(jenny.page, '@jenny');
+console.log('OK selected user survives refresh');
+
+// 5. signing out and back in as another user clears the previous user cache
+await jenny.page.getByRole('button', { name: 'Sign out' }).click();
+await jenny.page.getByLabel('Email').fill('devon@gradual.com');
+await jenny.page.getByLabel('Password').fill('password123');
+await jenny.page.getByRole('button', { name: 'Sign in', exact: true }).click();
+await jenny.page.getByRole('button', { name: 'Account menu' }).waitFor();
+await jenny.page.getByRole('button', { name: 'Account menu' }).click();
+await waitForText(jenny.page, '@devon');
+const ownUser = await jenny.page.evaluate(() => localStorage.getItem('gradual.userId'));
+const devonUser = await devon.page.evaluate(() => localStorage.getItem('gradual.userId'));
+if (!ownUser || ownUser !== devonUser)
+  throw new Error('Selected user should change after signing in as Devon');
+console.log('OK account switch updates the selected user');
 
 await jenny.context.close();
 await devon.context.close();

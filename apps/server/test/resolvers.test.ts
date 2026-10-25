@@ -1,14 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { ApolloServer } from '@apollo/server';
 import { createApolloServer } from '../src/graphql/server';
-import type { GraphQLContext } from '../src/auth/context';
 import { noopRealtime } from '../src/realtime/emitter';
 import { resetDatabase, startTestDatabase, type TestDatabase } from './helpers/db';
 import { createFixture, type Fixture } from './helpers/fixtures';
 
 let db: TestDatabase;
 let fx: Fixture;
-let apollo: ApolloServer<GraphQLContext>;
+let apollo: ReturnType<typeof createApolloServer>;
 
 beforeAll(async () => {
   db = await startTestDatabase();
@@ -25,216 +23,142 @@ beforeEach(async () => {
   fx = await createFixture();
 });
 
-function contextFor(user: Fixture['jenny'] | null): GraphQLContext {
-  return { user, emitter: noopRealtime };
+async function execute(query: string, variables: Record<string, unknown> = {}) {
+  const response = await apollo.executeOperation(
+    { query, variables },
+    { contextValue: { emitter: noopRealtime } },
+  );
+  if (response.body.kind !== 'single') throw new Error('Unexpected incremental result');
+  return response.body.singleResult;
 }
 
-describe('GraphQL auth', () => {
+async function send(body: string) {
+  const result = await execute(
+    'mutation($input: SendMessageInput!, $userId: ID!) { sendMessage(input: $input, userId: $userId) { id body author { username } mentions { username } } }',
+    { input: { channelId: fx.channelId, body }, userId: String(fx.jenny._id) },
+  );
+  expect(result.errors).toBeUndefined();
+  return result.data?.sendMessage as {
+    id: string;
+    body: string;
+    author: { username: string };
+    mentions: Array<{ username: string }>;
+  };
+}
+
+describe('password login', () => {
   it('rejects a wrong password', async () => {
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation { login(email: "jenny@test.dev", password: "nope") { token } }`,
-      },
-      { contextValue: contextFor(null) },
+    const result = await execute(
+      'mutation { login(email: "jenny@test.dev", password: "wrong") { id } }',
     );
-
-    expect(response.body.kind).toBe('single');
-    if (response.body.kind === 'single') {
-      expect(response.body.singleResult.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
-    }
+    expect(result.errors?.[0]?.message).toBe('Invalid email or password.');
   });
 
-  it('returns a token for valid credentials', async () => {
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation { login(email: "jenny@test.dev", password: "password123") { token user { username } } }`,
-      },
-      { contextValue: contextFor(null) },
+  it('rejects an unknown email', async () => {
+    const result = await execute(
+      'mutation { login(email: "nobody@test.dev", password: "password123") { id } }',
     );
-
-    expect(response.body.kind).toBe('single');
-    if (response.body.kind === 'single') {
-      const payload = response.body.singleResult.data?.login as {
-        token: string;
-        user: { username: string };
-      };
-      expect(payload.token).toBeTruthy();
-      expect(payload.user.username).toBe('jenny');
-    }
+    expect(result.errors?.[0]?.message).toBe('Invalid email or password.');
   });
 
-  it('guards the channels query', async () => {
-    const response = await apollo.executeOperation(
-      { query: `{ channels { id } }` },
-      { contextValue: contextFor(null) },
+  it('returns user information for valid credentials', async () => {
+    const result = await execute(
+      'mutation { login(email: " JENNY@test.dev ", password: "password123") { id username } }',
     );
-
-    if (response.body.kind === 'single') {
-      expect(response.body.singleResult.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
-    }
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.login).toEqual({ id: String(fx.jenny._id), username: 'jenny' });
   });
 });
 
-describe('GraphQL chat', () => {
-  it('lists channels with unread counts', async () => {
-    await apollo.executeOperation(
-      {
-        query: `mutation($input: SendMessageInput!) { sendMessage(input: $input) { id } }`,
-        variables: { input: { channelId: fx.channelId, body: 'hi @devon' } },
-      },
-      { contextValue: contextFor(fx.jenny) },
-    );
-
-    const response = await apollo.executeOperation(
-      {
-        query: `{ channels { id unreadCount lastMessage { body } } }`,
-      },
-      { contextValue: contextFor(fx.devon) },
-    );
-
-    if (response.body.kind === 'single') {
-      const channels = response.body.singleResult.data?.channels as Array<{
-        id: string;
-        unreadCount: number;
-        lastMessage: { body: string };
-      }>;
-      const share = channels.find((channel) => channel.id === fx.channelId);
-      expect(share?.unreadCount).toBe(1);
-      expect(share?.lastMessage.body).toBe('hi @devon');
-    }
+describe('GraphQL chat without request authentication', () => {
+  it('looks up the selected user and returns null for a missing user', async () => {
+    const result = await execute('query($id: ID!) { user(id: $id) { id username } }', {
+      id: String(fx.devon._id),
+    });
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.user).toEqual({ id: String(fx.devon._id), username: 'devon' });
+    const missing = await execute('query { user(id: "missing") { id } }');
+    expect(missing.data?.user).toBeNull();
   });
 
-  it('marks a channel as read and returns the fresh badge', async () => {
-    await apollo.executeOperation(
-      {
-        query: `mutation($input: SendMessageInput!) { sendMessage(input: $input) { id } }`,
-        variables: { input: { channelId: fx.channelId, body: 'unread' } },
-      },
-      { contextValue: contextFor(fx.jenny) },
+  it('lists channels and unread counts using the supplied user ID', async () => {
+    await send('hi @devon');
+    const result = await execute(
+      'query($userId: ID!) { channels(userId: $userId) { id unreadCount lastMessage { body } } }',
+      { userId: String(fx.devon._id) },
     );
-
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation($id: ID!) { markChannelRead(channelId: $id) { unreadCount } }`,
-        variables: { id: fx.channelId },
-      },
-      { contextValue: contextFor(fx.devon) },
-    );
-
-    if (response.body.kind === 'single') {
-      const payload = response.body.singleResult.data?.markChannelRead as { unreadCount: number };
-      expect(payload.unreadCount).toBe(0);
-    }
+    expect(result.errors).toBeUndefined();
+    const channels = result.data?.channels as Array<{
+      id: string;
+      unreadCount: number;
+      lastMessage: { body: string };
+    }>;
+    expect(channels.find((channel) => channel.id === fx.channelId)).toMatchObject({
+      unreadCount: 1,
+      lastMessage: { body: 'hi @devon' },
+    });
   });
 
-  it('sends a message through the mutation', async () => {
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation($input: SendMessageInput!) {
-          sendMessage(input: $input) { id body author { username } mentions { username } }
-        }`,
-        variables: { input: { channelId: fx.channelId, body: 'hello @grace' } },
-      },
-      { contextValue: contextFor(fx.jenny) },
+  it('marks the specified user channel as read', async () => {
+    await send('unread');
+    const result = await execute(
+      'mutation($channelId: ID!, $userId: ID!) { markChannelRead(channelId: $channelId, userId: $userId) { unreadCount } }',
+      { channelId: fx.channelId, userId: String(fx.devon._id) },
     );
-
-    if (response.body.kind === 'single') {
-      const message = response.body.singleResult.data?.sendMessage as {
-        body: string;
-        mentions: Array<{ username: string }>;
-      };
-      expect(message.body).toBe('hello @grace');
-      expect(message.mentions).toHaveLength(1);
-    }
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.markChannelRead).toEqual({ unreadCount: 0 });
   });
-});
 
-describe('GraphQL message maintenance', () => {
-  async function sendAs(
-    user: Fixture['jenny'],
-    body: string,
-  ): Promise<{ id: string; body: string }> {
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation($input: SendMessageInput!) { sendMessage(input: $input) { id body } }`,
-        variables: { input: { channelId: fx.channelId, body } },
-      },
-      { contextValue: contextFor(user) },
-    );
-    if (response.body.kind !== 'single') throw new Error('unexpected incremental result');
-    return response.body.singleResult.data?.sendMessage as { id: string; body: string };
-  }
+  it('sends a message and resolves its author and mentions', async () => {
+    const sent = await send('hello @grace');
+    expect(sent.body).toBe('hello @grace');
+    expect(sent.author.username).toBe('jenny');
+    expect(sent.mentions).toEqual([{ username: 'grace' }]);
+  });
 
   it('suggests users for the mention picker', async () => {
-    const response = await apollo.executeOperation(
-      { query: `{ users(query: "dev") { username } }` },
-      { contextValue: contextFor(fx.jenny) },
-    );
-
-    if (response.body.kind === 'single') {
-      const users = response.body.singleResult.data?.users as Array<{ username: string }>;
-      expect(users.map((user) => user.username)).toContain('devon');
-    }
+    const result = await execute('query { users(query: "dev") { username } }');
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.users).toEqual([{ username: 'devon' }]);
   });
 
-  it('edits the author’s own message', async () => {
-    const sent = await sendAs(fx.jenny, 'typo');
-
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation($id: ID!, $body: String!) { editMessage(id: $id, body: $body) { id body editedAt } }`,
-        variables: { id: sent.id, body: 'fixed' },
-      },
-      { contextValue: contextFor(fx.jenny) },
+  it('edits a message without a caller identity', async () => {
+    const sent = await send('typo');
+    const result = await execute(
+      'mutation($id: ID!) { editMessage(id: $id, body: "fixed") { body editedAt } }',
+      { id: sent.id },
     );
-
-    if (response.body.kind === 'single') {
-      const message = response.body.singleResult.data?.editMessage as {
-        body: string;
-        editedAt: string;
-      };
-      expect(message.body).toBe('fixed');
-      expect(message.editedAt).toBeTruthy();
-    }
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.editMessage).toMatchObject({ body: 'fixed', editedAt: expect.any(String) });
   });
 
-  it('refuses to edit somebody else’s message', async () => {
-    const sent = await sendAs(fx.jenny, 'mine');
-
-    const response = await apollo.executeOperation(
-      {
-        query: `mutation($id: ID!, $body: String!) { editMessage(id: $id, body: $body) { id } }`,
-        variables: { id: sent.id, body: 'hijacked' },
-      },
-      { contextValue: contextFor(fx.devon) },
+  it('deletes a message without a caller identity and removes it from the timeline', async () => {
+    const sent = await send('oops');
+    const deleted = await execute('mutation($id: ID!) { deleteMessage(id: $id) { id } }', {
+      id: sent.id,
+    });
+    expect(deleted.errors).toBeUndefined();
+    expect(deleted.data?.deleteMessage).toEqual({ id: sent.id });
+    const timeline = await execute(
+      'query($id: ID!) { messages(channelId: $id) { messages { id } } }',
+      { id: fx.channelId },
     );
-
-    if (response.body.kind === 'single') {
-      expect(response.body.singleResult.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
-    }
+    expect(timeline.errors).toBeUndefined();
+    expect(timeline.data?.messages).toEqual({ messages: [] });
   });
 
-  it('deletes the author’s own message and hides it from the timeline', async () => {
-    const sent = await sendAs(fx.jenny, 'oops');
-
-    const deleted = await apollo.executeOperation(
-      { query: `mutation($id: ID!) { deleteMessage(id: $id) { id } }`, variables: { id: sent.id } },
-      { contextValue: contextFor(fx.jenny) },
+  it('allows reading and sending to a channel without a membership check', async () => {
+    const result = await execute(
+      'mutation($input: SendMessageInput!, $userId: ID!) { sendMessage(input: $input, userId: $userId) { author { username } } }',
+      { input: { channelId: fx.otherChannelId, body: 'demo' }, userId: String(fx.devon._id) },
     );
-    if (deleted.body.kind === 'single') {
-      expect(deleted.body.singleResult.data?.deleteMessage).toMatchObject({ id: sent.id });
-    }
-
-    const timeline = await apollo.executeOperation(
-      {
-        query: `query($id: ID!) { messages(channelId: $id) { messages { id } } }`,
-        variables: { id: fx.channelId },
-      },
-      { contextValue: contextFor(fx.jenny) },
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.sendMessage).toEqual({ author: { username: 'devon' } });
+    const timeline = await execute(
+      'query($id: ID!) { messages(channelId: $id) { messages { body } } }',
+      { id: fx.otherChannelId },
     );
-    if (timeline.body.kind === 'single') {
-      const page = timeline.body.singleResult.data?.messages as { messages: Array<{ id: string }> };
-      expect(page.messages.map((message) => message.id)).not.toContain(sent.id);
-    }
+    expect(timeline.errors).toBeUndefined();
+    expect(timeline.data?.messages).toEqual({ messages: [{ body: 'demo' }] });
   });
 });

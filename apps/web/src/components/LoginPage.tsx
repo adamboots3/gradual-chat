@@ -3,6 +3,7 @@ import { useMutation } from '@apollo/client';
 import { LOGIN } from '../graphql/operations';
 import { LogoMark } from './TopBar';
 import { Avatar } from './Avatar';
+import type { User } from '../types';
 
 interface DemoAccount {
   name: string;
@@ -19,23 +20,23 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 const DEMO_PASSWORD = 'password123';
 
 interface LoginPageProps {
-  onAuthenticated: (token: string) => void;
+  onSignedIn: (user: User) => void;
 }
 
-export function LoginPage({ onAuthenticated }: LoginPageProps) {
+export function LoginPage({ onSignedIn }: LoginPageProps) {
   const [email, setEmail] = useState(DEMO_ACCOUNTS[0].email);
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
-  const [login, { loading }] = useMutation<{ login: { token: string } }>(LOGIN);
+  const [login, { loading }] = useMutation<{ login: User }>(LOGIN);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     try {
       const result = await login({ variables: { email, password } });
-      const token = result.data?.login.token;
-      if (!token) throw new Error('Login did not return a token.');
-      onAuthenticated(token);
+      const user = result.data?.login;
+      if (!user) throw new Error('Login did not return a user.');
+      onSignedIn(user);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not sign in.');
     }
@@ -133,7 +134,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-muted/70">Password for every demo account: {DEMO_PASSWORD}</p>
+            <p className="mt-2 text-[11px] text-muted/70">
+              Password for every demo account: {DEMO_PASSWORD}
+            </p>
           </div>
         </form>
 
