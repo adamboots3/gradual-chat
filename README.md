@@ -278,7 +278,7 @@ The client supplies `query.userId` when connecting. The gateway uses this ID to 
 │     │  └─ pages/             ChatPage
 │     └─ test/                 Vitest + Testing Library
 ├─ scripts/                    realtime smoke test and build helpers
-├─ docs/                       architecture diagrams and video script
+├─ docs/                       architecture diagrams and database structure
 ├─ Dockerfile                  multi-stage build (single runtime image)
 └─ docker-compose.yml          mongo + app
 ```

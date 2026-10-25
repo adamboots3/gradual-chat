@@ -249,7 +249,7 @@ apps/
    │  └─ pages/      聊天页面
    └─ test/          前端组件与缓存测试
 scripts/             实时冒烟测试、构建辅助脚本
-docs/                架构图与视频脚本
+docs/                架构图与数据库结构
 Dockerfile           多阶段镜像构建
 docker-compose.yml   应用与 MongoDB 服务
 ```
