@@ -6,14 +6,11 @@
 
 支持频道会话、未读消息计数、引用回复和 @提及，并包含前后端测试。
 
-![聊天界面](docs/screenshots/01-conversation.png)
-
 ## 目录
 
 - [快速启动](#快速启动)
 - [演示账号](#演示账号)
 - [功能清单](#功能清单)
-- [界面截图](#界面截图)
 - [架构与数据流](#架构与数据流)
 - [数据模型](#数据模型)
 - [GraphQL API](#graphql-api)
@@ -79,8 +76,6 @@ Docker Compose：执行 `docker compose exec app node apps/server/dist/seed/cli.
 
 ## 演示账号
 
-![登录界面](docs/screenshots/00-login.png)
-
 所有种子账号的密码均为 **`password123`**。种子包含 12 位用户；登录页列出 3 个常用账号，点击可预填表单，再按 Sign in 登录。
 
 | 姓名        | 邮箱                | 推荐用途                       |
@@ -104,27 +99,9 @@ Docker Compose：执行 `docker compose exec app node apps/server/dist/seed/cli.
 | 未读消息数            | 频道未读消息徽标、已读状态              | `apps/server/src/services/readState.ts`  |
 | 引用回复              | 消息自引用、同频道校验、引用预览        | `apps/server/src/services/messages.ts`   |
 | @提及                 | 解析、自动补全、高亮                    | `apps/server/src/services/mentions.ts`   |
-| 前后端测试            | 109 个测试，后端 50 个、前端 59 个      | `apps/server/test`、`apps/web/test`      |
+| 前后端测试            | 98 个测试，后端 42 个、前端 56 个       | `apps/server/test`、`apps/web/test`      |
 
-此外还提供消息分页、软删除、消息编辑 API、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。消息编辑目前通过 API 提供，前端未提供编辑入口。
-
-## 界面截图
-
-| 默认会话                                          | 悬停操作                                           |
-| ------------------------------------------------- | -------------------------------------------------- |
-| ![默认会话](docs/screenshots/01-conversation.png) | ![悬停操作](docs/screenshots/02-hover-actions.png) |
-
-| 引用回复                                         | @提及候选列表                              |
-| ------------------------------------------------ | ------------------------------------------ |
-| ![引用回复](docs/screenshots/03-quote-reply.png) | ![@提及](docs/screenshots/04-mentions.png) |
-
-截图来自运行中的应用。先启动开发服务，再在另一个终端执行：
-
-```bash
-npm run screenshots
-```
-
-脚本使用本机 Chrome 或 Edge，将截图保存到 `docs/screenshots`。未自动找到浏览器时，可设置 `CHROME_PATH` 指定可执行文件位置。
+此外还提供消息分页、列表搜索过滤、健康检查、Docker 配置和 GitHub Actions CI。
 
 ## 架构与数据流
 
@@ -143,10 +120,18 @@ sequenceDiagram
   API->>RT: ③ 调用事件广播
   RT-->>A: ④ 推送 message:new（频道房间，包含发送者）
   RT-->>B: ④ 推送 message:new（频道房间）
+  RT-->>A: 推送 channel:unread（发送者个人房间）
   RT-->>B: 推送 channel:unread（用户个人房间）
   API-->>A: ⑤ GraphQL / HTTP：返回保存的消息
   Note over A,B: 更新 Apollo 缓存，React 显示新消息；发送方按消息 ID 去重
+  opt 接收者当前选中此频道
+    B->>API: GraphQL / HTTP：markChannelRead
+    API->>DB: 将该用户的未读消息数清零
+    API-->>B: 返回 unreadCount 为 0 的频道数据
+  end
 ```
+
+HTTP 响应与 Socket.IO 事件使用不同传输通道，浏览器收到它们的先后顺序不固定。完整的前后端流程图见[架构说明](docs/architecture.md)。
 
 **GraphQL 负责读写，Socket.IO 负责实时通知。** 消息写入通过 mutation 完成，服务端保存后向频道成员广播。发送方也从 mutation 响应中获得消息，前端按消息 ID 去重。
 
@@ -166,7 +151,7 @@ sequenceDiagram
 ```text
 User      { id, name, username, email, passwordHash, avatarColor, title }
 Channel   { id, name, slug, type: 'channel'|'dm', memberIds[], order }
-Message   { id, channelId, authorId, body, replyToId?, mentionIds[], editedAt?, deletedAt? }
+Message   { id, channelId, authorId, body, replyToId?, mentionIds[] }
 ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount }
 ```
 
@@ -179,7 +164,7 @@ ReadState { channelId, userId, lastReadAt, lastReadMessageId, unreadCount }
 | `Channel`   | `{ memberIds: 1 }`                     | 查询用户加入的频道                 |
 | `User`      | `username`、`email` 唯一索引           | 登录和提及用户解析                 |
 
-未读消息数采用增量计数，减少侧栏查询时逐频道统计消息的开销。读取频道时清零，删除未读消息时相应减计数。@提及保留解析、自动补全和正文高亮，不单独维护未读计数或显示提及徽标；编辑提及不影响未读消息数。
+未读消息数采用增量计数，减少侧栏查询时逐频道统计消息的开销。发送消息时为其他成员增加未读数，读取频道时清零。@提及保留解析、自动补全和正文高亮，不单独维护未读计数或显示提及徽标。
 
 引用回复通过 `replyToId` 自引用实现。API 返回引用消息的精简预览，无需递归加载整个历史。
 
@@ -199,8 +184,6 @@ type Mutation {
   login(email: String!, password: String!): User!
   sendMessage(input: SendMessageInput!, userId: ID!): Message!
   markChannelRead(channelId: ID!, userId: ID!, lastMessageId: ID): Channel!
-  editMessage(id: ID!, body: String!): Message!
-  deleteMessage(id: ID!): Message!
 }
 ```
 
@@ -231,18 +214,16 @@ query Channels($userId: ID!) {
 }
 ```
 
-本版本保留账号密码登录，不维护 JWT 或服务端会话，也不做频道成员、消息作者权限校验。用户 ID 仅用于选择演示数据、记录发言人和未读数，不作为身份凭证。浏览器只保存用户 ID，不保存密码。
+本版本保留账号密码登录，不维护 JWT 或服务端会话，也不做频道成员权限校验。用户 ID 仅用于选择演示数据、记录发言人和未读数，不作为身份凭证。浏览器只保存用户 ID，不保存密码。
 
 错误通过 `extensions.code` 区分，包括 `BAD_USER_INPUT` 和 `NOT_FOUND`。
 
 ## 实时事件
 
-| 方向            | 事件              | 载荷                         |
-| --------------- | ----------------- | ---------------------------- |
-| 服务端 → 客户端 | `message:new`     | `{ message }`                |
-| 服务端 → 客户端 | `message:updated` | `{ message }`                |
-| 服务端 → 客户端 | `message:deleted` | `{ messageId, channelId }`   |
-| 服务端 → 客户端 | `channel:unread`  | `{ channelId, unreadCount }` |
+| 方向            | 事件             | 载荷                         |
+| --------------- | ---------------- | ---------------------------- |
+| 服务端 → 客户端 | `message:new`    | `{ message }`                |
+| 服务端 → 客户端 | `channel:unread` | `{ channelId, unreadCount }` |
 
 Socket.IO 连接时通过 `query.userId` 传入用户 ID，不执行鉴权。网关根据该 ID 加入 `user:<id>` 个人房间和用户所属的 `channel:<id>` 频道房间，分别用于未读计数推送和频道消息广播。
 
@@ -266,8 +247,8 @@ apps/
    │  ├─ lib/        Apollo、Socket.IO、缓存与格式化工具
    │  └─ pages/      聊天页面
    └─ test/          前端组件与缓存测试
-scripts/             截图、实时冒烟测试、构建辅助脚本
-docs/                演示截图与视频脚本
+scripts/             实时冒烟测试、构建辅助脚本
+docs/                架构图与视频脚本
 Dockerfile           多阶段镜像构建
 docker-compose.yml   应用与 MongoDB 服务
 ```
@@ -281,11 +262,11 @@ npm run lint
 npm run build
 ```
 
-当前共 **109 个测试：后端 50 个，前端 59 个**。
+当前共 **98 个测试：后端 42 个，前端 56 个**。
 
-后端测试使用独立的临时 MongoDB 实例，覆盖账号密码登录、用户查询、消息分页、引用校验、未读消息计数、提及解析、无鉴权的编辑删除及频道访问、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
+后端测试使用独立的临时 MongoDB 实例，覆盖账号密码登录、用户查询、消息分页、引用校验、未读消息计数、提及解析、无鉴权的频道访问及消息发送、HTTP 与 GraphQL 接口，以及真实 Socket.IO 客户端通信。
 
-前端使用 Vitest 和 Testing Library，覆盖登录、消息渲染、频道徽标、输入框、引用回复、格式化、错误边界和 Apollo 缓存。回归测试包括中文输入法防误发送、发送失败保留草稿并重试、可见提及候选的键盘导航和按所属频道删除缓存消息。
+前端使用 Vitest 和 Testing Library，覆盖登录、消息渲染、频道徽标、输入框、引用回复、格式化、错误边界和 Apollo 缓存。回归测试包括中文输入法防误发送、发送失败保留草稿并重试、可见提及候选的键盘导航和消息分页缓存。
 
 生成当前覆盖率报告（保存在 `apps/server/coverage` 和 `apps/web/coverage`，不在文档中固定百分比）：
 
@@ -301,7 +282,7 @@ npm run verify:realtime
 
 该脚本使用 Chrome 或 Edge 的两个独立会话，验证消息送达、未读徽标出现及打开频道后清零、刷新保留当前用户和退出后切换账号，并向当前开发数据库写入测试消息。
 
-推送到 `main` 或创建、更新 Pull Request 时，GitHub Actions 自动执行依赖安装、格式检查、lint、类型检查、测试和构建；通过后再进行 Docker Compose 启动与 API 检查。工作流定义见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。CI 不负责自动部署，双浏览器测试与截图仍需本地运行。
+推送到 `main` 或创建、更新 Pull Request 时，GitHub Actions 自动执行依赖安装、格式检查、lint、类型检查、测试和构建；通过后再进行 Docker Compose 启动与 API 检查。工作流定义见 [.github/workflows/ci.yml](.github/workflows/ci.yml)。CI 不负责自动部署，双浏览器测试仍需本地运行。
 
 ## 环境配置
 
@@ -323,7 +304,7 @@ npm run verify:realtime
 - Inter 可变字体随项目提供，避免依赖外部字体 CDN。
   字体的版权声明和许可证见 [OFL.txt](apps/web/public/fonts/OFL.txt)。
 - 头像使用姓名缩写和用户配色，便于离线运行。
-- 在设计基础上增加发送按钮、键盘提示和日期分隔线；所有消息均提供引用和删除入口。
+- 在设计基础上增加发送按钮、键盘提示和日期分隔线；所有消息均提供引用入口。
 - 支持粗体、斜体、删除线、行内代码和列表。消息以 React 元素渲染，不注入原始 HTML。
 
 ## 取舍与后续改进
@@ -333,6 +314,6 @@ npm run verify:realtime
 - **搜索范围有限。** 频道列表上方的唯一搜索框过滤频道名称和已加载的最新消息摘要，不检索历史消息；顶部搜索框和静态时区标签已移除。
 - **设计占位。** Forum、Matches、Members、Contributors、通知和帮助图标、成员数按钮保留设计外观，未接入额外页面或弹窗；当前实现的是 Chat 页面。
 - **功能范围。** 只维护未读消息数；@提及保留补全和高亮，不提供未读提及徽标；没有“对方正在输入”提示及对应事件。
-- **引用删除。** 软删除消息后，该消息从会话列表中移除；已有的引用预览仍保留正文。
+- **已发送消息。** 支持发送和引用，不提供编辑或删除已发送消息的功能。
 - **简化登录。** `localStorage` 只保存当前用户 ID，登录时校验密码，后续接口不做身份与权限校验。
 - **未读一致性。** 当前增量维护计数，高并发场景仍需完善事务、一致性处理和定期校准机制。

@@ -1,25 +1,4 @@
 import type { Channel, Message, MessagePreview, User } from '../types';
-import type { ApolloCache } from '@apollo/client';
-import { MESSAGES } from '../graphql/operations';
-
-export function removeCachedMessage(
-  cache: ApolloCache<unknown>,
-  messageId: string,
-  channelId: string,
-): void {
-  cache.updateQuery<{ messages: { messages: Message[]; nextCursor: string | null } }>(
-    { query: MESSAGES, variables: { channelId } },
-    (data) =>
-      data
-        ? {
-            messages: {
-              ...data.messages,
-              messages: data.messages.messages.filter((message) => message.id !== messageId),
-            },
-          }
-        : data,
-  );
-}
 
 /**
  * Objects that arrive over socket.io never went through a GraphQL document, so
@@ -72,14 +51,6 @@ export function messageToPreview(message: Message): CachedPreview {
     body: message.body,
     createdAt: message.createdAt,
     author: message.author,
-  });
-}
-
-/** Refresh sidebar and quoted previews when their source message is edited. */
-export function updateCachedPreview(cache: ApolloCache<unknown>, message: Message): void {
-  cache.modify({
-    id: cache.identify({ __typename: 'MessagePreview', id: message.id }),
-    fields: { body: () => message.body },
   });
 }
 

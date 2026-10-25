@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Message } from '../src/models/Message';
 import { ReadState } from '../src/models/ReadState';
 import { listChannelsForUser } from '../src/services/channels';
-import { deleteMessage, editMessage, listMessages, sendMessage } from '../src/services/messages';
+import { listMessages, sendMessage } from '../src/services/messages';
 import { markChannelRead } from '../src/services/readState';
 import { resetDatabase, startTestDatabase, type TestDatabase } from './helpers/db';
 import { createFixture, type Fixture } from './helpers/fixtures';
@@ -102,59 +101,12 @@ describe('sendMessage', () => {
 });
 
 describe('unread bookkeeping', () => {
-  it('rejects invalid message IDs and oversized edits with clear errors', async () => {
-    await expect(editMessage('invalid', 'hello')).rejects.toThrow('Message not found.');
-    await expect(deleteMessage('invalid')).rejects.toThrow('Message not found.');
-    const sent = await sendMessage(
-      { channelId: fx.channelId, body: 'original' },
-      String(fx.jenny._id),
-    );
-    await expect(editMessage(sent.message.id, 'x'.repeat(4001))).rejects.toThrow(/too long/i);
-    expect((await Message.findById(sent.message.id))?.body).toBe('original');
-  });
-  it('updates mentions on edit without changing unread message counts', async () => {
-    const sent = await sendMessage(
-      { channelId: fx.channelId, body: 'hello @devon' },
-      String(fx.jenny._id),
-    );
-    const edited = await editMessage(sent.message.id, 'hello @grace');
-    expect(edited.message.mentions.map((user) => user.username)).toEqual(['grace']);
-    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
-    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
-    await editMessage(sent.message.id, 'hello @grace again');
-    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(1);
-    await deleteMessage(sent.message.id);
-    expect(await unreadFor(fx.channelId, String(fx.grace._id))).toBe(0);
-    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
-  });
-
-  it('does not make an already read message unread when adding a mention', async () => {
-    const sent = await sendMessage(
-      { channelId: fx.channelId, body: 'hello' },
-      String(fx.jenny._id),
-    );
-    await markChannelRead(fx.channelId, String(fx.devon._id));
-    await editMessage(sent.message.id, 'hello @devon');
-    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
-  });
-
   it('clears the counters when the channel is read', async () => {
     await sendMessage({ channelId: fx.channelId, body: 'hello @devon' }, String(fx.jenny._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
 
     await markChannelRead(fx.channelId, String(fx.devon._id));
     expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
-  });
-
-  it('decrements unread when an unread message is deleted', async () => {
-    const sent = await sendMessage({ channelId: fx.channelId, body: 'oops' }, String(fx.jenny._id));
-    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(1);
-
-    await deleteMessage(sent.message.id);
-    expect(await unreadFor(fx.channelId, String(fx.devon._id))).toBe(0);
-
-    const stored = await Message.findById(sent.message.id);
-    expect(stored?.deletedAt).toBeInstanceOf(Date);
   });
 
   it('surfaces unread counts in the channel list', async () => {
@@ -196,13 +148,5 @@ describe('listMessages', () => {
     });
     expect(third.messages.map((message) => message.body)).toEqual(['message 0']);
     expect(third.nextCursor).toBeNull();
-  });
-
-  it('hides deleted messages', async () => {
-    const sent = await sendMessage({ channelId: fx.channelId, body: 'gone' }, String(fx.jenny._id));
-    await deleteMessage(sent.message.id);
-
-    const page = await listMessages({ channelId: fx.channelId });
-    expect(page.messages).toHaveLength(0);
   });
 });

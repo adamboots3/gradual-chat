@@ -13,12 +13,8 @@ export interface MessageEvent {
  */
 export interface RealtimeEmitter {
   messageCreated(event: MessageEvent): Promise<void>;
-  messageUpdated(event: MessageEvent): Promise<void>;
-  messageDeleted(event: MessageEvent): Promise<void>;
 }
 
 export const noopRealtime: RealtimeEmitter = {
   async messageCreated() {},
-  async messageUpdated() {},
-  async messageDeleted() {},
 };

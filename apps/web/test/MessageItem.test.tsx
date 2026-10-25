@@ -24,9 +24,7 @@ const baseMessage: Message = {
 
 describe('MessageItem', () => {
   it('renders the author, time and body', () => {
-    render(
-      <MessageItem message={baseMessage} isMine={false} onQuote={vi.fn()} onDelete={vi.fn()} />,
-    );
+    render(<MessageItem message={baseMessage} isMine={false} onQuote={vi.fn()} />);
 
     expect(screen.getByText('Jenny White')).toBeInTheDocument();
     expect(screen.getByText(/I will take a look/)).toBeInTheDocument();
@@ -46,7 +44,6 @@ describe('MessageItem', () => {
         }}
         isMine={false}
         onQuote={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -54,34 +51,20 @@ describe('MessageItem', () => {
     expect(screen.getByText(/Check out Vanilla Forums/)).toBeInTheDocument();
   });
 
-  it('offers quote and delete on every message', async () => {
+  it('offers a quote reply action on every message', async () => {
     const onQuote = vi.fn();
-    const onDelete = vi.fn();
 
     const { rerender } = render(
-      <MessageItem message={baseMessage} isMine={false} onQuote={onQuote} onDelete={onDelete} />,
+      <MessageItem message={baseMessage} isMine={false} onQuote={onQuote} />,
     );
 
     expect(screen.getByRole('button', { name: 'Quote reply' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete message' }));
-    expect(onDelete).toHaveBeenCalledWith(baseMessage);
+    await userEvent.click(screen.getByRole('button', { name: 'Quote reply' }));
+    expect(onQuote).toHaveBeenCalledWith(baseMessage);
 
-    rerender(<MessageItem message={baseMessage} isMine onQuote={onQuote} onDelete={onDelete} />);
+    rerender(<MessageItem message={baseMessage} isMine onQuote={onQuote} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete message' }));
-    expect(onDelete).toHaveBeenCalledWith(baseMessage);
-    expect(onDelete).toHaveBeenCalledTimes(2);
-  });
-
-  it('marks the message as edited', () => {
-    render(
-      <MessageItem
-        message={{ ...baseMessage, editedAt: new Date().toISOString() }}
-        isMine
-        onQuote={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-    );
-    expect(screen.getByText('(edited)')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Quote reply' }));
+    expect(onQuote).toHaveBeenCalledTimes(2);
   });
 });

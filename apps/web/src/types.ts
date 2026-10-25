@@ -19,7 +19,6 @@ export interface Message {
   body: string;
   author: User;
   createdAt: string;
-  editedAt?: string | null;
   replyTo?: MessagePreview | null;
   mentions: User[];
 }

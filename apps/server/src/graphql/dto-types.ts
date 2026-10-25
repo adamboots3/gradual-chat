@@ -13,7 +13,6 @@ export interface MessageLike {
   channelId: mongoose.Types.ObjectId | string;
   body: string;
   createdAt: Date;
-  editedAt?: Date | null;
   authorId: UserLike;
   replyToId?: (MessageLike & { authorId: UserLike }) | null;
   mentionIds?: UserLike[] | null;

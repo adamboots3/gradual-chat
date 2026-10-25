@@ -15,8 +15,6 @@ const messageSchema = new Schema(
     /** Quote reply target — a self reference so previews stay one query away. */
     replyToId: { type: Schema.Types.ObjectId, ref: 'Message', default: null },
     mentionIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    editedAt: { type: Date, default: null },
-    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

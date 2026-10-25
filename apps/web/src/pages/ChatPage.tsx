@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
-import {
-  CHANNELS,
-  DELETE_MESSAGE,
-  MARK_CHANNEL_READ,
-  USER,
-  MESSAGES,
-  SEND_MESSAGE,
-} from '../graphql/operations';
+import { CHANNELS, MARK_CHANNEL_READ, USER, MESSAGES, SEND_MESSAGE } from '../graphql/operations';
 import type { Channel, Message, User } from '../types';
 import { TopBar } from '../components/TopBar';
 import { SideRail } from '../components/SideRail';
@@ -16,13 +9,7 @@ import { ChatHeader } from '../components/ChatHeader';
 import { MessageList } from '../components/MessageList';
 import { Composer } from '../components/Composer';
 import { connectRealtime, type RealtimeClient } from '../lib/socket';
-import {
-  cacheMessage,
-  messageToPreview,
-  patchChannel,
-  removeCachedMessage,
-  updateCachedPreview,
-} from '../lib/cache';
+import { cacheMessage, messageToPreview, patchChannel } from '../lib/cache';
 
 interface MessagesData {
   messages: { messages: Message[]; nextCursor: string | null };
@@ -53,7 +40,6 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
 
   const [markRead] = useMutation(MARK_CHANNEL_READ);
   const [sendMessage] = useMutation(SEND_MESSAGE);
-  const [deleteMessage] = useMutation(DELETE_MESSAGE);
 
   const me = meData?.user ?? null;
   const channels = useMemo(() => channelData?.channels ?? [], [channelData]);
@@ -118,13 +104,6 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
     [client, userId],
   );
 
-  const removeMessage = useCallback(
-    (messageId: string, channelId: string) => {
-      removeCachedMessage(client.cache, messageId, channelId);
-    },
-    [client],
-  );
-
   const updateChannelBadge = useCallback(
     (channelId: string, unreadCount: number) => {
       client.cache.updateQuery<{ channels: Channel[] }>(
@@ -159,28 +138,6 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
           });
         }
       },
-      onMessageUpdated(message) {
-        updateCachedPreview(client.cache, message);
-        const updated = cacheMessage(message);
-        client.cache.updateQuery<MessagesData, MessagesVars>(
-          { query: MESSAGES, variables: { channelId: updated.channelId } },
-          (data) => {
-            if (!data) return data;
-            return {
-              messages: {
-                ...data.messages,
-                messages: data.messages.messages.map((item) =>
-                  item.id === updated.id ? updated : item,
-                ),
-              },
-            };
-          },
-        );
-      },
-      onMessageDeleted(payload) {
-        removeMessage(payload.messageId, payload.channelId);
-        void client.refetchQueries({ include: [CHANNELS] });
-      },
       onUnread(payload) {
         updateChannelBadge(payload.channelId, payload.unreadCount);
       },
@@ -189,7 +146,7 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
     return () => {
       realtime.disconnect();
     };
-  }, [userId, me, appendMessage, removeMessage, updateChannelBadge, markRead, client]);
+  }, [userId, me, appendMessage, updateChannelBadge, markRead, client]);
 
   const activeChannel = channels.find((channel) => channel.id === activeId) ?? null;
   const unreadTotal = channels.reduce((total, channel) => total + channel.unreadCount, 0);
@@ -202,13 +159,6 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
     const message = result.data?.sendMessage as Message | undefined;
     if (message) appendMessage(message);
     setReplyTo(null);
-  };
-
-  const handleDelete = async (message: Message) => {
-    if (!window.confirm('Delete this message?')) return;
-    await deleteMessage({ variables: { id: message.id } });
-    removeMessage(message.id, message.channelId);
-    void client.refetchQueries({ include: [CHANNELS] });
   };
 
   if (meLoading) {
@@ -260,7 +210,6 @@ export function ChatPage({ userId, onSignOut }: ChatPageProps) {
                 channelId={activeChannel.id}
                 currentUserId={me.id}
                 onQuote={setReplyTo}
-                onDelete={(message) => void handleDelete(message)}
               />
               <Composer
                 channelName={activeChannel.name}

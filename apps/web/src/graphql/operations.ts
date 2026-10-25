@@ -16,7 +16,6 @@ export const MESSAGE_FIELDS = gql`
     channelId
     body
     createdAt
-    editedAt
     author {
       ...UserFields
     }
@@ -104,15 +103,6 @@ export const SEND_MESSAGE = gql`
     }
   }
   ${MESSAGE_FIELDS}
-`;
-
-export const DELETE_MESSAGE = gql`
-  mutation DeleteMessage($id: ID!) {
-    deleteMessage(id: $id) {
-      id
-      channelId
-    }
-  }
 `;
 
 export const MARK_CHANNEL_READ = gql`

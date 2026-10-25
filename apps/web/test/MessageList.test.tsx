@@ -22,7 +22,6 @@ function messageNode(id: string, body: string, createdAt: string) {
     channelId: 'c1',
     body,
     createdAt,
-    editedAt: null,
     author,
     mentions: [],
     replyTo: null,
@@ -61,7 +60,7 @@ describe('MessageList', () => {
   it('renders the timeline with a day divider', async () => {
     render(
       <MockedProvider mocks={[firstPage]} cache={createCache()}>
-        <MessageList channelId="c1" currentUserId="u1" onQuote={vi.fn()} onDelete={vi.fn()} />
+        <MessageList channelId="c1" currentUserId="u1" onQuote={vi.fn()} />
       </MockedProvider>,
     );
 
@@ -73,7 +72,7 @@ describe('MessageList', () => {
   it('prepends older pages when loading earlier messages', async () => {
     render(
       <MockedProvider mocks={[firstPage, olderPage]} cache={createCache()}>
-        <MessageList channelId="c1" currentUserId="u1" onQuote={vi.fn()} onDelete={vi.fn()} />
+        <MessageList channelId="c1" currentUserId="u1" onQuote={vi.fn()} />
       </MockedProvider>,
     );
 
@@ -104,7 +103,7 @@ describe('MessageList', () => {
         ]}
         cache={createCache()}
       >
-        <MessageList channelId="empty" currentUserId="u1" onQuote={vi.fn()} onDelete={vi.fn()} />
+        <MessageList channelId="empty" currentUserId="u1" onQuote={vi.fn()} />
       </MockedProvider>,
     );
 

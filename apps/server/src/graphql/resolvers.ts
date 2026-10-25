@@ -4,13 +4,7 @@ import type { GraphQLContext } from './context';
 import { verifyPassword } from '../services/passwords';
 import { User } from '../models/User';
 import { getChannelForUser, listChannelsForUser } from '../services/channels';
-import {
-  deleteMessage,
-  editMessage,
-  listMessages,
-  sendMessage,
-  type SendMessageInput,
-} from '../services/messages';
+import { listMessages, sendMessage, type SendMessageInput } from '../services/messages';
 import { markChannelRead } from '../services/readState';
 import { toUserDTO } from './dto';
 import { escapeRegExp } from '../utils/regex';
@@ -96,22 +90,6 @@ export const resolvers = {
       }
       await markChannelRead(args.channelId, args.userId, args.lastMessageId ?? null);
       return getChannelForUser(args.channelId, args.userId);
-    },
-
-    editMessage: async (
-      _parent: unknown,
-      args: { id: string; body: string },
-      context: GraphQLContext,
-    ) => {
-      const result = await editMessage(args.id, args.body);
-      await context.emitter.messageUpdated(result);
-      return result.message;
-    },
-
-    deleteMessage: async (_parent: unknown, args: { id: string }, context: GraphQLContext) => {
-      const result = await deleteMessage(args.id);
-      await context.emitter.messageDeleted(result);
-      return result.message;
     },
   },
 };

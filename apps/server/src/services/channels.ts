@@ -15,7 +15,7 @@ async function lastMessagePerChannel(
 
   // One round trip for the newest message of every channel.
   const grouped = await Message.aggregate([
-    { $match: { channelId: { $in: channelIds }, deletedAt: null } },
+    { $match: { channelId: { $in: channelIds } } },
     { $sort: { _id: -1 } },
     { $group: { _id: '$channelId', doc: { $first: '$$ROOT' } } },
   ]);

@@ -1,7 +1,7 @@
 import type { Message, MessagePreview } from '../types';
 import { Avatar } from './Avatar';
 import { MessageBody } from './MessageBody';
-import { QuoteIcon, TrashIcon } from './icons';
+import { QuoteIcon } from './icons';
 import { formatTime, previewText } from '../lib/format';
 
 interface QuotePreviewProps {
@@ -27,10 +27,9 @@ interface MessageItemProps {
   message: Message;
   isMine: boolean;
   onQuote: (message: Message) => void;
-  onDelete: (message: Message) => void;
 }
 
-export function MessageItem({ message, isMine, onQuote, onDelete }: MessageItemProps) {
+export function MessageItem({ message, isMine, onQuote }: MessageItemProps) {
   const bubbleTone = isMine ? 'bg-mint text-ink' : 'bg-[#33323C] text-content';
 
   return (
@@ -46,7 +45,6 @@ export function MessageItem({ message, isMine, onQuote, onDelete }: MessageItemP
         <div className="mb-1 flex items-baseline gap-2 text-[12px]">
           <span className="font-medium text-content/80">{message.author.name}</span>
           <span className="text-muted">{formatTime(message.createdAt)}</span>
-          {message.editedAt ? <span className="text-muted/70">(edited)</span> : null}
         </div>
 
         {message.replyTo ? (
@@ -76,15 +74,6 @@ export function MessageItem({ message, isMine, onQuote, onDelete }: MessageItemP
             title="Quote reply"
           >
             <QuoteIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(message)}
-            className="flex h-7 w-7 items-center justify-center rounded text-muted transition hover:bg-badge/20 hover:text-badge"
-            aria-label="Delete message"
-            title="Delete message"
-          >
-            <TrashIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

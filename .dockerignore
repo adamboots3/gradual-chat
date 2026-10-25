@@ -9,7 +9,6 @@ coverage
 .tools
 .refs
 figma
-docs/screenshots
 *.md
 !README.md
 .env

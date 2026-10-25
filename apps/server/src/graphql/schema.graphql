@@ -24,7 +24,6 @@ type Message {
   body: String!
   author: User!
   createdAt: DateTime!
-  editedAt: DateTime
   replyTo: MessagePreview
   mentions: [User!]!
 }
@@ -71,6 +70,4 @@ type Mutation {
   login(email: String!, password: String!): User!
   sendMessage(input: SendMessageInput!, userId: ID!): Message!
   markChannelRead(channelId: ID!, userId: ID!, lastMessageId: ID): Channel!
-  editMessage(id: ID!, body: String!): Message!
-  deleteMessage(id: ID!): Message!
 }

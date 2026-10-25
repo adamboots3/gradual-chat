@@ -23,7 +23,6 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "screenshots": "node scripts/capture.mjs",
     "verify:realtime": "node scripts/realtime-smoke.mjs"
   },
   "devDependencies": {

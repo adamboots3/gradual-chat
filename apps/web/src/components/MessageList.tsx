@@ -21,10 +21,9 @@ interface MessageListProps {
   channelId: string;
   currentUserId: string;
   onQuote: (message: Message) => void;
-  onDelete: (message: Message) => void;
 }
 
-export function MessageList({ channelId, currentUserId, onQuote, onDelete }: MessageListProps) {
+export function MessageList({ channelId, currentUserId, onQuote }: MessageListProps) {
   const { data, loading, error, fetchMore } = useQuery<MessagesData, MessagesVars>(MESSAGES, {
     variables: { channelId },
     fetchPolicy: 'cache-and-network',
@@ -115,7 +114,6 @@ export function MessageList({ channelId, currentUserId, onQuote, onDelete }: Mes
                 message={message}
                 isMine={message.author.id === currentUserId}
                 onQuote={onQuote}
-                onDelete={onDelete}
               />
             </div>
           );

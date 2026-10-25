@@ -69,15 +69,6 @@ export const QuoteIcon = (props: IconProps) => (
   </Icon>
 );
 
-export const TrashIcon = (props: IconProps) => (
-  <Icon {...props}>
-    <path d="M4 7h16" />
-    <path d="M10 4h4" />
-    <path d="M6 7l1 13h10l1-13" />
-    <path d="M10 11v5M14 11v5" />
-  </Icon>
-);
-
 export const BoldIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7z" />

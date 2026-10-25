@@ -2,7 +2,6 @@ import { Types, type FilterQuery, type PopulateOptions } from 'mongoose';
 import { Channel, type ChannelDocument } from '../models/Channel';
 import { Message } from '../models/Message';
 import { User } from '../models/User';
-import { ReadState } from '../models/ReadState';
 import { toMessageDTO, type MessageDTO } from '../graphql/dto';
 import type { MessageLike } from '../graphql/dto-types';
 import type { MessageEvent } from '../realtime/emitter';
@@ -58,7 +57,7 @@ export async function sendMessage(input: SendMessageInput, userId: string): Prom
     if (!Types.ObjectId.isValid(input.replyToId)) {
       throw notFound('The quoted message no longer exists.');
     }
-    const quoted = await Message.findOne({ _id: input.replyToId, deletedAt: null });
+    const quoted = await Message.findById(input.replyToId);
     if (!quoted) throw notFound('The quoted message no longer exists.');
     if (String(quoted.channelId) !== String(channel._id)) {
       throw badUserInput('You can only quote a message from the same channel.');
@@ -101,7 +100,7 @@ export async function listMessages(params: {
   await getChannel(params.channelId);
 
   const limit = clampLimit(params.limit);
-  const filter: FilterQuery<unknown> = { channelId: params.channelId, deletedAt: null };
+  const filter: FilterQuery<unknown> = { channelId: params.channelId };
   if (params.cursor) {
     filter._id = { $lt: decodeCursor(params.cursor) };
   }
@@ -119,60 +118,5 @@ export async function listMessages(params: {
   return {
     messages: page.reverse().map((doc) => toMessageDTO(doc as unknown as MessageLike)),
     nextCursor,
-  };
-}
-
-export type MessageMutationResult = MessageEvent;
-
-export async function editMessage(messageId: string, body: string): Promise<MessageMutationResult> {
-  const trimmed = body.trim();
-  if (trimmed.length === 0) throw badUserInput('Message cannot be empty.');
-  if (trimmed.length > 4000) throw badUserInput('Message is too long (max 4000 characters).');
-  if (!Types.ObjectId.isValid(messageId)) throw notFound('Message not found.');
-
-  const message = await Message.findOne({ _id: messageId, deletedAt: null });
-  if (!message) throw notFound('Message not found.');
-  message.body = trimmed;
-  message.editedAt = new Date();
-  message.mentionIds = await resolveMentionIds(trimmed, String(message.authorId));
-  await message.save();
-
-  const channel = await Channel.findById(message.channelId);
-
-  return {
-    message: await findPopulatedMessage(messageId),
-    channelId: String(message.channelId),
-    memberIds: (channel?.memberIds ?? []).map(String),
-  };
-}
-
-export async function deleteMessage(messageId: string): Promise<MessageMutationResult> {
-  if (!Types.ObjectId.isValid(messageId)) throw notFound('Message not found.');
-  const message = await Message.findOne({ _id: messageId, deletedAt: null });
-  if (!message) throw notFound('Message not found.');
-  const channelId = message.channelId;
-  const authorId = message.authorId;
-
-  message.deletedAt = new Date();
-  await message.save();
-
-  // Keep the denormalised badge honest: everybody who has not read this message
-  // loses one unread unit.
-  await ReadState.updateMany(
-    {
-      channelId,
-      userId: { $ne: authorId },
-      lastReadAt: { $lt: message.createdAt },
-      unreadCount: { $gt: 0 },
-    },
-    { $inc: { unreadCount: -1 } },
-  );
-
-  const channel = await Channel.findById(channelId);
-
-  return {
-    message: await findPopulatedMessage(messageId),
-    channelId: String(channelId),
-    memberIds: (channel?.memberIds ?? []).map(String),
   };
 }

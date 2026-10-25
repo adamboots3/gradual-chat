@@ -122,31 +122,6 @@ describe('GraphQL chat without request authentication', () => {
     expect(result.data?.users).toEqual([{ username: 'devon' }]);
   });
 
-  it('edits a message without a caller identity', async () => {
-    const sent = await send('typo');
-    const result = await execute(
-      'mutation($id: ID!) { editMessage(id: $id, body: "fixed") { body editedAt } }',
-      { id: sent.id },
-    );
-    expect(result.errors).toBeUndefined();
-    expect(result.data?.editMessage).toMatchObject({ body: 'fixed', editedAt: expect.any(String) });
-  });
-
-  it('deletes a message without a caller identity and removes it from the timeline', async () => {
-    const sent = await send('oops');
-    const deleted = await execute('mutation($id: ID!) { deleteMessage(id: $id) { id } }', {
-      id: sent.id,
-    });
-    expect(deleted.errors).toBeUndefined();
-    expect(deleted.data?.deleteMessage).toEqual({ id: sent.id });
-    const timeline = await execute(
-      'query($id: ID!) { messages(channelId: $id) { messages { id } } }',
-      { id: fx.channelId },
-    );
-    expect(timeline.errors).toBeUndefined();
-    expect(timeline.data?.messages).toEqual({ messages: [] });
-  });
-
   it('allows reading and sending to a channel without a membership check', async () => {
     const result = await execute(
       'mutation($input: SendMessageInput!, $userId: ID!) { sendMessage(input: $input, userId: $userId) { author { username } } }',

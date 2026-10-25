@@ -21,7 +21,6 @@ export interface MessageDTO {
   body: string;
   author: UserDTO;
   createdAt: string;
-  editedAt: string | null;
   replyTo: MessagePreviewDTO | null;
   mentions: UserDTO[];
 }
@@ -63,7 +62,6 @@ export function toMessageDTO(message: MessageLike): MessageDTO {
     body: message.body,
     author: toUserDTO(message.authorId),
     createdAt: message.createdAt.toISOString(),
-    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
     replyTo: message.replyToId ? toPreviewDTO(message.replyToId) : null,
     mentions: (message.mentionIds ?? []).filter(Boolean).map(toUserDTO),
   };

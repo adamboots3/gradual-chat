@@ -24,8 +24,6 @@ interface RawMessage {
   mentionIds: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
-  editedAt: null;
-  deletedAt: null;
 }
 
 /**
@@ -94,8 +92,6 @@ export async function seedDatabase(options: { force?: boolean } = {}): Promise<S
         mentionIds,
         createdAt,
         updatedAt: createdAt,
-        editedAt: null,
-        deletedAt: null,
       });
       void index;
     });
