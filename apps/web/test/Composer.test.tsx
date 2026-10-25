@@ -197,6 +197,10 @@ describe('Composer', () => {
     input.setSelectionRange(6, 6);
     await userEvent.click(screen.getByRole('button', { name: 'Mention someone' }));
     await screen.findByRole('listbox');
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+      expect(input.selectionStart).toBe(7);
+    });
     await userEvent.keyboard('{Enter}');
     expect(input).toHaveValue('hello @devon team');
   });
