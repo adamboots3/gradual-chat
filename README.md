@@ -7,6 +7,17 @@ Apollo GraphQL and MongoDB on the back end, and Socket.IO for realtime delivery.
 
 Supports channel conversations, unread message counts, quote replies and @mentions, with frontend and backend tests.
 
+## Implemented requirements
+
+| Requirement | Status |
+| --- | :---: |
+| Web UI based on the provided design | ✅ |
+| Essential realtime chat using Socket.IO | ✅ |
+| Unread message counts (optional) | ✅ |
+| Quote reply database model and related API (optional) | ✅ |
+| Member mentions (optional) | ✅ |
+| Frontend and backend unit tests (optional) | ✅ |
+
 https://github.com/user-attachments/assets/71c3699d-d0cb-43e6-b57b-1e6cbfcd651f
 
 ---
