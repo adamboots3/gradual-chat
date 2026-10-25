@@ -22,7 +22,6 @@ Supports channel conversations, unread message counts, quote replies and @mentio
 - [Testing](#testing)
 - [Configuration](#configuration)
 - [Design notes](#design-notes)
-- [Trade-offs and what is next](#trade-offs-and-what-is-next)
 
 ---
 
@@ -366,23 +365,3 @@ Development tools also accept `API_PROXY_TARGET` (Vite API proxy target, default
   streams show a day divider. A quote reply action is available on every message.
 - **Markdown-lite** formatting (`**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, lists) is rendered to React
   elements — never `innerHTML` — so a message cannot inject markup.
-
----
-
-## Trade-offs and what is next
-
-- **Single replica only.** Socket rooms live in process memory. Horizontal scaling would need the
-  `@socket.io/redis-adapter` and a shared presence store; that is deliberately out of scope here.
-- **No attachments.** Upload and file storage are out of scope; no attachment action is offered in the composer.
-- **Limited search.** The single search field above the conversation list filters channel names and latest-message
-  previews already loaded in the browser. It does not search message history. The top-bar search and static timezone
-  label were removed.
-- **Design placeholders.** Forum, Matches, Members, Contributors, notification/help icons and the member-count
-  button retain the design's appearance but do not open additional views. Chat is the implemented section.
-- **Simplified scope.** Only unread message counts are maintained. @mentions have autocomplete and highlighting,
-  with no separate unread mention badge. Typing-status events and indicators are not implemented.
-- **Sent messages.** Messages can be sent and quoted; editing and deleting sent messages are not supported.
-- **Demo login.** Only the selected user ID is stored in `localStorage`; passwords are checked at login and
-  never stored in the browser. Subsequent requests do not use authentication or access control.
-- **Unread reconciliation.** Counters are maintained incrementally; a background job recomputing them from
-  `lastReadAt` would be the safety net in production.
