@@ -1,6 +1,6 @@
 # 架构与消息流
 
-下面三张图对应当前代码：发送、引用回复、@提及和未读消息计数。保留密码登录，后续请求直接传入用户 ID；没有消息编辑、消息删除或输入状态事件。
+下面的图对应当前代码中的消息流程、前后端组件和数据库结构。支持发送、引用回复、@提及和未读消息计数。保留密码登录，后续请求直接传入用户 ID；没有消息编辑、消息删除或输入状态事件。
 
 ## 1. 发送消息与标记已读
 
@@ -110,3 +110,96 @@ Socket.IO 挂载在共享的 HTTP server 上，连接建立不经过 Apollo Serv
 - 未读计数：[readState.ts](../apps/server/src/services/readState.ts)
 - 房间与事件广播：[realtime/index.ts](../apps/server/src/realtime/index.ts)
 - 前端实时事件与缓存更新：[ChatPage.tsx](../apps/web/src/pages/ChatPage.tsx)
+
+## 4. 数据库集合与关系
+
+MongoDB 中有四个业务集合，名称由 Mongoose 模型名自动转为小写复数：
+
+| 模型        | 实际集合名   | 一条文档表示什么                                 |
+| ----------- | ------------ | ------------------------------------------------ |
+| `User`      | `users`      | 一位用户及其登录、展示信息                       |
+| `Channel`   | `channels`   | 一个频道或私聊会话及其成员                       |
+| `Message`   | `messages`   | 一条已发送的消息，可引用另一条消息、提及多位用户 |
+| `ReadState` | `readstates` | 一位用户在一个频道的未读数和已读位置             |
+
+```mermaid
+erDiagram
+  users {
+    ObjectId _id PK "用户 ID"
+    string name "显示姓名"
+    string username UK "用户名，用于 @提及"
+    string email UK "登录邮箱"
+    string passwordHash "bcrypt 密码哈希"
+    string avatarColor "头像颜色"
+    string title "个人介绍或职务"
+    Date createdAt "创建时间"
+    Date updatedAt "更新时间"
+  }
+  channels {
+    ObjectId _id PK "频道 ID"
+    string name "频道或私聊名称"
+    string slug UK "唯一频道标识"
+    string type "channel 或 dm"
+    ObjectIdArray memberIds FK "成员 ID 数组，关联 users"
+    number order "侧栏排序，默认 0"
+    Date createdAt "创建时间"
+    Date updatedAt "更新时间"
+  }
+  messages {
+    ObjectId _id PK "消息 ID"
+    ObjectId channelId FK "所属频道"
+    ObjectId authorId FK "发言用户"
+    string body "正文，最多 4000 字符"
+    ObjectId replyToId FK "被引用消息 ID，可为空"
+    ObjectIdArray mentionIds FK "被提及用户 ID 数组"
+    Date createdAt "发送时间"
+    Date updatedAt "更新时间"
+  }
+  readstates {
+    ObjectId _id PK "已读状态记录 ID"
+    ObjectId channelId FK "所属频道"
+    ObjectId userId FK "所属用户"
+    Date lastReadAt "最近标记已读时间"
+    ObjectId lastReadMessageId FK "最近已读消息 ID，可为空"
+    number unreadCount "未读消息数，默认 0"
+    Date createdAt "创建时间"
+    Date updatedAt "更新时间"
+  }
+  users }o--o{ channels : "成员关系，保存在 memberIds"
+  users ||--o{ messages : "发送，authorId"
+  channels ||--o{ messages : "包含，channelId"
+  users }o--o{ messages : "被提及，mentionIds"
+  messages |o--o{ messages : "被引用，replyToId"
+  users ||--o{ readstates : "拥有，userId"
+  channels ||--o{ readstates : "拥有，channelId"
+  messages |o--o{ readstates : "最近已读，lastReadMessageId"
+```
+
+图中的 `ObjectIdArray` 表示 ObjectId 数组。`PK` 标记文档主键，`UK` 标记唯一索引，`FK` 仅表示应用中的 ID 引用关系，MongoDB 不会像关系型数据库一样自动检查外键，也没有额外的成员或提及关联表。
+
+四个模型都启用了 `timestamps`，由 Mongoose 维护 `createdAt` 和 `updatedAt`；`updatedAt` 是通用时间字段，不代表提供了消息编辑功能。Mongoose 还可能保存内部版本字段 `__v`，图中省略了这个非业务字段。
+
+### 关键字段与约束
+
+- **用户**：`name`、`username`、`email`、`passwordHash`、`avatarColor` 为必填。用户名和邮箱保存为小写且各自唯一；`title` 默认空字符串。密码只保存哈希，不保存明文。
+- **频道**：`name`、`slug` 为必填；`type` 只允许 `channel`、`dm`，默认 `channel`。`memberIds` 直接保存成员 ID。一个用户可以加入多个频道，一个频道也可以有多位用户。
+- **消息**：`channelId`、`authorId`、`body` 为必填。`replyToId` 默认 `null`，普通消息不需要引用目标；引用回复仍然作为一条新消息保存，服务端校验目标属于同一频道。`mentionIds` 保存正文中解析出的用户 ID，不维护单独的未读提及数。
+- **已读状态**：`channelId`、`userId` 为必填；二者组合唯一，因此每位用户在每个频道最多一条记录。`unreadCount` 最小值为 0；`lastReadMessageId` 默认 `null`，`lastReadAt` 默认 Unix 纪元时间，初始化数据可以设置初始已读位置。
+
+例如，Devon 在两个频道各有一条 `readstates` 记录，其中一个频道的未读数可以是 3，另一个可以是 0。Jenny 在第一个频道发消息时，Devon 对应记录的 `unreadCount` 加 1；Devon 打开该频道时，这条记录的计数清零，不影响其他频道。
+
+### 索引
+
+除 MongoDB 默认的 `_id` 唯一索引外，当前模型声明了以下索引：
+
+| 集合         | 索引                               | 作用                       |
+| ------------ | ---------------------------------- | -------------------------- |
+| `users`      | `username` 唯一；`email` 唯一      | 用户名查找和邮箱登录       |
+| `channels`   | `slug` 唯一；`memberIds`           | 频道标识与查询用户所属频道 |
+| `messages`   | `channelId`；`authorId`            | 按频道、发言人查找         |
+| `messages`   | `{ channelId: 1, _id: -1 }`        | 按频道进行消息游标分页     |
+| `messages`   | `{ channelId: 1, createdAt: -1 }`  | 按频道和时间查找           |
+| `readstates` | `{ channelId: 1, userId: 1 }` 唯一 | 每个用户和频道一条已读状态 |
+| `readstates` | `userId`                           | 查询用户的各频道未读状态   |
+
+模型定义：[User.ts](../apps/server/src/models/User.ts)、[Channel.ts](../apps/server/src/models/Channel.ts)、[Message.ts](../apps/server/src/models/Message.ts)、[ReadState.ts](../apps/server/src/models/ReadState.ts)。

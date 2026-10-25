@@ -175,6 +175,9 @@ the API and socket connection use the same origin.
 
 ## Data model
 
+See the [collection structure and relationship diagram](docs/architecture.md#4-数据库集合与关系) for all four
+MongoDB collections, field types, references and indexes.
+
 ```
 User      { id, name, username, email, passwordHash, avatarColor, title }
 Channel   { id, name, slug, type: 'channel'|'dm', memberIds[], order }

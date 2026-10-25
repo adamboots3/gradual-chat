@@ -148,6 +148,8 @@ HTTP 响应与 Socket.IO 事件使用不同传输通道，浏览器收到它们�
 
 ## 数据模型
 
+完整的四个集合、字段类型、关联关系和索引见[数据库结构图](docs/architecture.md#4-数据库集合与关系)。
+
 ```text
 User      { id, name, username, email, passwordHash, avatarColor, title }
 Channel   { id, name, slug, type: 'channel'|'dm', memberIds[], order }
